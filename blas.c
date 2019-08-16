@@ -1,7 +1,7 @@
 #include "emdnn.h"
 #include <math.h>
 #include <float.h>
-float* input_img(float* input, int C, int H, int W){
+float* input_bin_img(float* input, int C, int H, int W){
     FILE *fin = fopen("dog.bin", "rb");
     if (!fin) {
         printf("Input file does not exist.\n");
@@ -31,6 +31,18 @@ void transpose(float *INA, float *OUTA,
         }
     }
 }
+//merged donghee's code
+void cpu_gemv(float *A, float *B, float *C, 
+               int M, int N, int K){  //N=1
+    for (int m = 0; m < M; ++m) {
+        float sum = 0;
+        for (int k = 0; k < K; ++k) {
+            sum += A[m * K + k] * B[k];
+        }
+        C[m] = sum;
+    }
+    printf(" > gemv ");
+}
 void cpu_gemm(float *A, float *B, float *C, 
               int M, int N, int K){
     for(int m = 0; m < M; ++m){
@@ -42,6 +54,18 @@ void cpu_gemm(float *A, float *B, float *C,
             C[m*N+n] = sum;
         }
     }
+    // //C+= register block
+    // for(int MN = 0; MN < M*N; ++MN){
+    //     C[MN] = 0;
+    // }
+    // for(int m = 0; m < M; ++m){
+    //     for(int k = 0; k < K; ++k){
+    //         register float Apart = A[m*K+k];
+    //         for(int n = 0; n < N; ++n){
+    //             C[m*N+n] += Apart * B[k*N+n];
+    //         }
+    //     }
+    // }
     printf(" > gemm ");
 }
 void cpu_stride_b_gemm(float *A, float *B, float *C, 
@@ -75,7 +99,7 @@ void im2col(float *in, float *out,
     if(pad == 0){
         start_xy = (KER/2);
     }else{
-        start_xy = 0;
+        start_xy = (KER/2)-pad;
     }
     for(int c = 0; c < C; ++c){
         for(int hout = start_xy; hout <H-start_xy; hout+=stride){
@@ -109,26 +133,35 @@ void im2col(float *in, float *out,
 
 void maxpool(float *in, float *out, 
              int C, int H, int W, 
-             int KER, int stride){
+             int KER, int stride, int PAD){
+    int center =  KER/2;
+    int offset = -KER/2;
+    
+    //pad 값 있는경우 추가 작성해야함..
+    
     //NC HW RS
     for(int c = 0; c < C; c++){
-        for(int h = 0; h < H; h=h+stride){
-            for(int w = 0; w < W; w=w+stride){
+        for(int h = center; h < H; h=h+stride){
+            for(int w = center; w < W; w=w+stride){
                 float max = -FLT_MAX;
-                for(int r = 0; r<KER; ++r){
-                    for(int s = 0; s<KER; ++s){
-                        if(w+s < W || h+r < H){
-                            max = fmaxf(in[W * H * c + W*(h+r) + (w+s)], max);
-                        }
+                for(int r = offset; r<(KER+offset); ++r){
+                    for(int s = offset; s<(KER+offset); ++s){
+                        // if(w+s < W || h+r < H){
+                        max = fmaxf(in[W * H * c + W*(h+r) + (w+s)], max);
+                        // }
                     }
                 }
-                out[ H/stride * W/stride * c + W/stride * h/stride + w/stride] = max;
+                out[ (W/stride) * (H/stride) * c + 
+                     (W/stride) * ((h-center)/stride) + 
+                    ((w-center)/stride)] = max;
             }
         }
     }
 }
 
-void avgpool(float *in, float *out, int H, int W, int C, int KER, int stride){
+void avgpool(float *in, float *out, 
+             int H, int W, int C, 
+             int KER, int stride, int PAD){
     // double check_time = get_time();
     float mean_n = KER*KER;
     // printf("maxpool start_xy : %d\n",start_xy);
@@ -147,27 +180,27 @@ void avgpool(float *in, float *out, int H, int W, int C, int KER, int stride){
 	}
     // if(dark_DEBUG)  printf("m %.6f\n", get_time()-check_time);
 }
-void softmax(float *out, float *in, int K){
+void softmax(float *in, float *out, int C){
     // double check_time = get_time();
     float max = -FLT_MAX;
     
-    for (int kk = 0; kk < K; kk++) {
-        // printf("%.6f \n",in[kk]);
-        if (in[kk] > max) {
-            max = in[kk];
+    for (int cc = 0; cc < C; cc++) {
+        // printf("%.6f \n",in[cc]);
+        if (in[cc] > max) {
+            max = in[cc];
         }
     }
 
     float sum = 0.0f;
-    for (int kk = 0; kk < K; kk++) {
-        float e = expf(in[kk] - max);
+    for (int cc = 0; cc < C; cc++) {
+        float e = expf(in[cc] - max);
         sum += e;
-        out[kk] = e;
+        out[cc] = e;
     }
 
-    for (int kk = 0; kk < K; kk++) {
+    for (int cc = 0; cc < C; cc++) {
         
-        out[kk] /= sum;
+        out[cc] /= sum;
     }
 
     // if(dark_DEBUG)  printf("soft %.6f\n", get_time()-check_time);

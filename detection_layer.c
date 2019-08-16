@@ -195,8 +195,7 @@ void detection(float *grid_cell,float* box_out,
     // float anchor[10] =  {1.3221, 1.73145, 3.19275, 4.00944, 5.05587, 8.09892, 9.47112, 4.84053, 11.2364, 10.0071};
     
     int total_box = 0;
- 
-    
+     
     for(int i =0; i<det_CLASS; ++i){
         dbox[i].score = (float*)malloc(det_h * det_w * det_BOX * sizeof(float));
         dbox[i].coord = (int*)malloc(det_h * det_w * det_BOX * 4 * sizeof(int));

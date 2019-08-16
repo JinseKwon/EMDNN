@@ -3,6 +3,11 @@
 #include <unistd.h>
 #include <math.h>
 #include <float.h>
+#include "opencv/highgui.h"
+// #include "image_io.h"
+#ifdef OPENCL
+#include <CL/cl.h>
+#endif
 
 extern "C"
 
@@ -15,7 +20,8 @@ typedef enum{
     SOFTMAX,
     AVGPOOL,
     SHORTCUT,
-    DETECTION
+    DETECTION,
+    CLASSIFICATION
 }LAYER_TYPE;
 
 //layer print할때 enumerate 열거형 string 형태로 표기하기 위함
@@ -70,11 +76,21 @@ typedef struct LAYER{
     //im2col
     int IM2COL;
 
+    //opencl
+    int opencl_enable;
+
     //DATA
     float* BIAS;
     float* WEIGHT;
     float* INPUT;
     float* OUTPUT;
+
+#ifdef OPENCL
+    cl_mem CL_WEIGHT;
+    cl_mem CL_BIAS;
+    cl_mem CL_INPUT;
+    cl_mem CL_OUTPUT;
+#endif
 
 //TODO
     //half_float
@@ -87,7 +103,8 @@ extern void make_network(LAYER *l,
             int num,
             char *filename);
 
-extern void layer_update(
+extern LAYER* layer_update(
+// extern void layer_update(
             LAYER *l,
             LAYER_TYPE type, 
             ACTIVATION_TYPE act,
@@ -104,25 +121,27 @@ extern void inference(LAYER *l,
 void im2col(float *in, float *out, 
             int C, int H, int W, 
             int KER, int stride, int pad);
+//donghee
+void cpu_gemv(float *A, float *B, float *C, int M, int N, int K);  
 void cpu_gemm(float *A, float *B, float *C, int M, int N, int K);
 void cpu_stride_b_gemm(float *A, float *B, float *C, 
                       int M, int N, int K,
                       int stride_b, int batch_count);
 
-float* input_img(float* input, int C, int H, int W);
+float* input_bin_img(float* input, int C, int H, int W);
 void batch_normalizaiton(float *bias, float *weight, 
                          int K, int C, int H, int W);
 void bias_add(float* in, float* bias, 
               int C, int H, int W);
-void softmax(float *out, float *in, int K);
+void softmax(float *in, float *out, int C);
 void activate_function(float* in, ACTIVATION_TYPE act, 
                        int C, int H, int W);
 
 void transpose(float *INA, float *OUTA, 
                int ldx, int ldy);
 
-void maxpool(float *in, float *out, int H, int W, int C, int KER, int stride);
-void avgpool(float *in, float *out, int H, int W, int C, int KER, int stride);
+void maxpool(float *in, float *out, int H, int W, int C, int KER, int stride, int PAD);
+void avgpool(float *in, float *out, int H, int W, int C, int KER, int stride, int PAD);
 void detection(float *grid_cell,float* box_out,
                int input_width,
                int det_h,
@@ -131,3 +150,13 @@ void detection(float *grid_cell,float* box_out,
                int det_CLASS,
                float score_threshold,
                float iou_threshold);
+
+void classification(float *output_score, int class_num);//donghee
+
+// void cam_read(float *image, int img_size);
+IplImage* image_read(char *img_file, float *image, int img_size);
+
+// void imagefile_read( float *image, int img_size, char *filename);
+// void imagefile_read2( float *image, int img_size,int n);
+void image_show(float* box_output, IplImage *readimg);
+void image_free();
