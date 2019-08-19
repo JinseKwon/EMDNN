@@ -1,6 +1,14 @@
 #include "emdnn.h"
 #include <math.h>
 #include <float.h>
+
+#ifdef CLBLAST
+#include <clblast_c.h>
+#endif
+#ifdef OPENBLAS
+#include <cblas.h>
+#endif
+
 float* input_bin_img(float* input, int C, int H, int W){
     FILE *fin = fopen("dog.bin", "rb");
     if (!fin) {
@@ -85,6 +93,46 @@ void cpu_stride_b_gemm(float *A, float *B, float *C,
     printf(" > str_gemm ");
 }
 
+void gemm(LAYER *l, int i,
+          int ta, int tb,
+          int M, int N, int K,
+          float ALPHA, float BETA){
+#ifdef CLBLAST
+    mem2cl_obj(l[i].CL_WEIGHT, l[i].WEIGHT);
+    mem2cl_obj(l[i].CL_INPUT,  l[i].INPUT );
+    mem2cl_obj(l[i].CL_OUTPUT, l[i].OUTPUT);
+    CLBlastStatusCode status;
+    status = CLBlastSgemm(CLBlastLayoutRowMajor,
+                    CLBlastTransposeNo, CLBlastTransposeNo,
+                    M, N, K,
+                    1.0f,
+                    l[i].CL_WEIGHT, 0, K,
+                    l[i].CL_INPUT , 0, N,
+                    0.0f,
+                    l[i].CL_OUTPUT, 0, N,
+                    l[i].QUE, l[i].EVT);
+    if (status == CLBlastSuccess) {
+    clWaitForEvents(1, l[i].EVT);
+    }
+    cl_obj2mem(l[i].CL_WEIGHT, &l[i].WEIGHT,CL_MAP_WRITE, M*K*l[i].XF);
+    cl_obj2mem(l[i].CL_INPUT,  &l[i].INPUT, CL_MAP_WRITE, K*N*l[i].XF);
+    cl_obj2mem(l[i].CL_OUTPUT, &l[i].OUTPUT,CL_MAP_WRITE, M*N*l[i].XF);
+#else
+#ifdef OPENBLAS
+    cblas_sgemm(CblasRowMajor,
+                CblasNoTrans, CblasNoTrans,
+                M, N, K,
+                1.0f,
+                l[i].WEIGHT, K,
+                l[i].INPUT , N,
+                0.0f,
+                l[i].OUTPUT, N);
+#else
+    cpu_gemm(l[i].WEIGHT, l[i].INPUT, l[i].OUTPUT,
+             M, N, K);
+#endif
+#endif
+}
 //im2col은 >> CONV 시   weight * input으로 처리하도록 수정해야함.
 // ex) input CHW로 들어오도록 처리해야함 (OpenCV는 HWC로 들어옴..)
 // 따라서 Weight * Input으로 처리해야 darknet, CAFFE NCHW로 구성되어 있으므로 
@@ -230,6 +278,7 @@ void bias_add(float* in, float* bias,
             in[c*H*W + hw] += bias[c];
         }
     }
+    printf(" > bias ");
 }
 void activate_function(float* in, ACTIVATION_TYPE act, 
                        int C, int H, int W){
@@ -249,4 +298,5 @@ void activate_function(float* in, ACTIVATION_TYPE act,
     default:
         return;
     }
+    printf(" > activation ");
 }

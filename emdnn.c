@@ -1,10 +1,29 @@
 #include "emdnn.h"
 #include <stdlib.h>
+
 //vscode 화면 뷰로 인함. 임시작성 배포시 삭제.
-#define OPENCL
+// #define OPENCL
 
 #ifdef OPENCL
 #include "opencl_init.h"
+
+#include <clblast_c.h>
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS // to disable deprecation warnings
+
+//ABSTRATION of CL MAPPING FUNCTION 
+void cl_obj2mem(cl_mem cl_obj, float** host_mem, 
+                cl_map_flags map_flag, int m_size){
+    *host_mem = (float*)clEnqueueMapBuffer(queue, cl_obj, CL_TRUE, CL_MAP_WRITE, 0,
+                                m_size, 0, NULL, NULL, &err);
+    CHECK_ERROR(err);
+    // printf("> cl_mem to mem ");
+}
+//ABSTRATION of CL UNMAPPING FUNCTION 
+void mem2cl_obj(cl_mem cl_obj, float* host_mem){
+    err = clEnqueueUnmapMemObject(queue, cl_obj, host_mem, 0, NULL, NULL);
+    CHECK_ERROR(err);
+    // printf("> mem to cl_mem ");
+}
 #endif
 
 // float* file_loader(float* network, int f_size, char *filename){
@@ -27,24 +46,7 @@ float* file_loader(float* network, char *filename){
 
     return network;
 }
-#ifdef OPENCL
-cl_mem cl_obj_create(cl_mem cl_obj, int m_size){
-    return clCreateBuffer(context, CL_MEM_READ_WRITE, m_size, NULL, &err);
-    // CHECK_ERROR(err);
-    // return cl_obj;
-}
-//ABSTRATION of CL MAPPING FUNCTION 
-void cl_obj2mem(cl_mem cl_obj, float** host_mem, int m_size ){
-    *host_mem = (float*)clEnqueueMapBuffer(queue, cl_obj, CL_TRUE, CL_MAP_WRITE, 0,
-                                m_size, 0, NULL, NULL, &err);
-    CHECK_ERROR(err);
-}
-//ABSTRATION of CL UNMAPPING FUNCTION 
-void mem2cl_obj(cl_mem cl_obj, float* host_mem){
-    err = clEnqueueUnmapMemObject(queue, cl_obj, host_mem, 0, NULL, NULL);
-    CHECK_ERROR(err);
-}
-#endif
+
 void make_network(LAYER *l,
             float* net_weight, 
             int num,
@@ -79,11 +81,18 @@ void make_network(LAYER *l,
             l[i].OUT_C = l[i].C;
             l[i].OUT_H = l[i].H;
             l[i].OUT_W = l[i].W;
+#ifdef OPENCL
 
+            l[i].CL_OUTPUT =
+            cl_obj_create(l[i].CL_OUTPUT,
+                          l[i].OUT_C * l[i].OUT_H * l[i].OUT_W * l[i].XF);
+            cl_obj2mem(   l[i].CL_OUTPUT, &l[i].OUTPUT, CL_MAP_WRITE,
+                          l[i].OUT_C * l[i].OUT_H * l[i].OUT_W * l[i].XF);
+#else
             l[i].OUTPUT = (float*)malloc(l[i].OUT_C * 
                                          l[i].OUT_H * l[i].OUT_W * 
                                          l[i].XF);
-            // printf("input making...\n");
+#endif
             break;
 
         case CONVOLUTIONAL :
@@ -100,32 +109,22 @@ void make_network(LAYER *l,
             //cl_obj2mem( CL_OBJ, mem_arry, size)
             l[i].CL_BIAS = 
             cl_obj_create(l[i].CL_BIAS,
-                          l[i].N * l[i].SCALE * sizeof(float));
-            cl_obj2mem(   l[i].CL_BIAS, &l[i].BIAS, 
-                          l[i].N * l[i].SCALE * sizeof(float));
-            // l[i].CL_BIAS = clCreateBuffer(context, CL_MEM_READ_WRITE, 
-            //                                     l[i].N * l[i].SCALE * 
-            //                                     sizeof(float), NULL, &err);
-            // l[i].BIAS = (float*)clEnqueueMapBuffer(queue, l[i].CL_BIAS, CL_TRUE, CL_MAP_WRITE, 0,
-            //                                     l[i].N * l[i].SCALE * 
-            //                                     sizeof(float), 0, NULL, NULL, &err);
+                          l[i].N * l[i].SCALE * l[i].XF);
+            cl_obj2mem(   l[i].CL_BIAS, &l[i].BIAS, CL_MAP_WRITE,
+                          l[i].N * l[i].SCALE * l[i].XF);
+
             memcpy( l[i].BIAS, net_weight,
-                    l[i].N * l[i].SCALE *sizeof(float));
+                    l[i].N * l[i].SCALE * l[i].XF);
             net_weight += l[i].N * l[i].SCALE;
 
             l[i].CL_WEIGHT = 
             cl_obj_create(l[i].CL_WEIGHT, 
-                          l[i].N * l[i].C * l[i].H * l[i].W *sizeof(float));
-            cl_obj2mem(   l[i].CL_WEIGHT, &l[i].WEIGHT, 
-                          l[i].N * l[i].C * l[i].H * l[i].W *sizeof(float));
-            // l[i].CL_WEIGHT = clCreateBuffer(context, CL_MEM_READ_WRITE, 
-            //                                     l[i].N * l[i].C * l[i].H * l[i].W *
-            //                                     sizeof(float), NULL, &err);
-            // l[i].WEIGHT = (float*)clEnqueueMapBuffer(queue, l[i].CL_WEIGHT, CL_TRUE, CL_MAP_WRITE, 0,
-            //                                     l[i].N * l[i].C * l[i].H * l[i].W *
-            //                                     sizeof(float), 0, NULL, NULL, &err);
+                          l[i].N * l[i].C * l[i].H * l[i].W * l[i].XF);
+            cl_obj2mem(   l[i].CL_WEIGHT, &l[i].WEIGHT, CL_MAP_WRITE,
+                          l[i].N * l[i].C * l[i].H * l[i].W * l[i].XF);
+
             memcpy( l[i].WEIGHT, net_weight,
-                    l[i].N * l[i].C * l[i].H * l[i].W *sizeof(float));
+                    l[i].N * l[i].C * l[i].H * l[i].W * l[i].XF);
             net_weight += l[i].N * l[i].C * l[i].H * l[i].W;
             if(l[i].SCALE != 1){
                 batch_normalizaiton(l[i].BIAS, l[i].WEIGHT, 
@@ -138,34 +137,22 @@ void make_network(LAYER *l,
                 cl_obj_create(l[i].CL_INPUT,
                               l[i].IN_C * l[i].OUT_H * l[i].OUT_W * 
                               l[i].H * l[i].W * l[i].XF);
-                cl_obj2mem(   l[i].CL_INPUT, &l[i].INPUT, 
+                cl_obj2mem(   l[i].CL_INPUT, &l[i].INPUT, CL_MAP_WRITE,
                               l[i].IN_C * l[i].OUT_H * l[i].OUT_W * 
                               l[i].H * l[i].W * l[i].XF);
-                // l[i].CL_INPUT = clCreateBuffer(context, CL_MEM_READ_WRITE, 
-                //                                 l[i].IN_C * 
-                //                                 l[i].OUT_H * l[i].OUT_W * 
-                //                                 l[i].H * l[i].W * 
-                //                                 l[i].XF, NULL, &err);
-                // l[i].INPUT = (float*)clEnqueueMapBuffer(queue, l[i].CL_INPUT, CL_TRUE, CL_MAP_WRITE, 0 ,
-                //                                 l[i].IN_C * 
-                //                                 l[i].OUT_H * l[i].OUT_W * 
-                //                                 l[i].H * l[i].W * 
-                //                                 l[i].XF, 0, NULL, NULL, &err);
                 l[i].IM2COL = 1;
+            }else{
+                l[i].CL_INPUT = 
+                cl_obj_create(l[i].CL_INPUT,
+                              l[i].IN_C * l[i].IN_H * l[i].IN_W * l[i].XF);
+                cl_obj2mem(   l[i].CL_INPUT, &l[i].INPUT, CL_MAP_WRITE,
+                              l[i].IN_C * l[i].IN_H * l[i].IN_W * l[i].XF);
             }
             l[i].CL_OUTPUT = 
             cl_obj_create(l[i].CL_OUTPUT,
                           l[i].OUT_C *l[i].OUT_H * l[i].OUT_W * l[i].XF);
-            cl_obj2mem(   l[i].CL_OUTPUT, &l[i].OUTPUT, 
+            cl_obj2mem(   l[i].CL_OUTPUT, &l[i].OUTPUT, CL_MAP_WRITE,
                           l[i].OUT_C *l[i].OUT_H * l[i].OUT_W * l[i].XF);
-            // l[i].CL_OUTPUT = clCreateBuffer(context, CL_MEM_READ_WRITE, 
-            //                                 l[i].OUT_C * 
-            //                                 l[i].OUT_H * l[i].OUT_W * 
-            //                                 l[i].XF, NULL, &err);
-            // l[i].OUTPUT = (float*)clEnqueueMapBuffer(queue, l[i].CL_OUTPUT, CL_TRUE, CL_MAP_WRITE, 0 ,
-            //                                 l[i].OUT_C * 
-            //                                 l[i].OUT_H * l[i].OUT_W * 
-            //                                 l[i].XF, 0, NULL, NULL, &err);
 #else
             l[i].BIAS   = net_weight; 
                           net_weight += l[i].N * l[i].SCALE;
@@ -230,15 +217,51 @@ void make_network(LAYER *l,
             l[i].OUT_C = l[i].N;
             l[i].OUT_H = 1;
             l[i].OUT_W = 1;
-            
+
+#ifdef OPENCL
+            l[i].CL_BIAS = 
+            cl_obj_create(l[i].CL_BIAS,  
+                          l[i].N * l[i].SCALE * l[i].XF);
+            cl_obj2mem(   l[i].CL_BIAS, &l[i].BIAS, CL_MAP_WRITE,
+                          l[i].N * l[i].SCALE * l[i].XF);
+            memcpy( l[i].BIAS, net_weight,
+                    l[i].N * l[i].SCALE * l[i].XF);
+            net_weight += l[i].N * l[i].SCALE;
+
+            l[i].CL_WEIGHT = 
+            cl_obj_create(l[i].CL_WEIGHT, 
+                          l[i].N * l[i].C * l[i].XF);
+            cl_obj2mem(   l[i].CL_WEIGHT, &l[i].WEIGHT, CL_MAP_WRITE,
+                          l[i].N * l[i].C * l[i].XF);
+            memcpy( l[i].WEIGHT, net_weight,
+                    l[i].N * l[i].C * l[i].XF);
+            net_weight += l[i].N * l[i].C;
+
+            if(l[i].SCALE != 1){
+                batch_normalizaiton(l[i].BIAS, l[i].WEIGHT, 
+                l[i].N, l[i].C, 1, 1 );
+            }
+
+            l[i].CL_OUTPUT = 
+            cl_obj_create(l[i].CL_OUTPUT,
+                          l[i].N * l[i].XF);
+            cl_obj2mem(   l[i].CL_OUTPUT, &l[i].OUTPUT, CL_MAP_WRITE,
+                          l[i].N * l[i].XF);
+#else
             l[i].BIAS   = net_weight; 
                           net_weight += l[i].N * l[i].SCALE;
             //TODO : BIAS term processing...
 
             l[i].WEIGHT = net_weight; 
                           net_weight += l[i].N * l[i].C;
-            l[i].OUTPUT = (float*)malloc(l[i].N * l[i].XF);
 
+            if(l[i].SCALE != 1){
+                batch_normalizaiton(l[i].BIAS, l[i].WEIGHT, 
+                l[i].N, l[i].C, 1, 1 );
+            }
+
+            l[i].OUTPUT = (float*)malloc(l[i].N * l[i].XF);
+#endif
             // file_access += l[i].N * l[i].SCALE + l[i].N * l[i].C;
             break;
 
@@ -337,6 +360,11 @@ LAYER* layer_update(
     
     //TODO : precision hard coding
     l[num].XF          = SINGLE; 
+
+#ifdef OPENCL
+    l[num].QUE         = &queue;
+    l[num].EVT         = &event;
+#endif
     
     return l;   
 }
@@ -381,7 +409,9 @@ void inference(LAYER *l,
                         l[i].W,
                         l[i].STRIDE, l[i].PAD);
             }else{
-                l[i].INPUT = l[i-1].OUTPUT;
+                // l[i].INPUT = l[i-1].OUTPUT;
+                memcpy( l[i].INPUT, l[i-1].OUTPUT,
+                        l[i].IN_C * l[i].IN_H * l[i].IN_W * l[i].XF);
             }
 //debuging code
 // for(int rr = 0; rr<3*3*3; ++rr){
@@ -393,10 +423,39 @@ void inference(LAYER *l,
 //         printf("%f ",l[i].INPUT[rr * l[i].IN_H * l[i].IN_W + 0]);
 //     }
 // }
-            cpu_gemm(l[i].WEIGHT, l[i].INPUT, l[i].OUTPUT,
-                     l[i].N,
-                     l[i].OUT_H*l[i].OUT_W,
-                     l[i].C * l[i].H * l[i].W);
+            // mem2cl_obj(l[i].CL_WEIGHT, l[i].WEIGHT);
+            // mem2cl_obj(l[i].CL_INPUT,  l[i].INPUT );
+            // mem2cl_obj(l[i].CL_OUTPUT, l[i].OUTPUT);
+            
+            // err = clEnqueueUnmapMemObject(queue, l[i].CL_WEIGHT, l[i].WEIGHT, 0, NULL, NULL);
+            // CHECK_ERROR(err);
+            // err = clEnqueueUnmapMemObject(queue, l[i].CL_INPUT,  l[i].INPUT,  0, NULL, NULL);
+            // CHECK_ERROR(err);
+            // err = clEnqueueUnmapMemObject(queue, l[i].CL_OUTPUT, l[i].OUTPUT, 0, NULL, NULL);
+            // CHECK_ERROR(err);
+            gemm(l, i, 
+                 0, 0,
+                 l[i].N,
+                 l[i].OUT_H * l[i].OUT_W,
+                 l[i].C * l[i].H * l[i].W,
+                 1.0f, 0.0f);
+            // CLBlastStatusCode status;
+            // status = CLBlastSgemm(CLBlastLayoutRowMajor,
+            //                 CLBlastTransposeNo, CLBlastTransposeNo,
+            //                 l[i].N, l[i].OUT_H * l[i].OUT_W, l[i].C * l[i].H * l[i].W,
+            //                 1.0f,
+            //                 l[i].CL_WEIGHT, 0, l[i].C * l[i].H * l[i].W,
+            //                 l[i].CL_INPUT , 0, l[i].OUT_H * l[i].OUT_W,
+            //                 0.0f,
+            //                 l[i].CL_OUTPUT, 0, l[i].OUT_H * l[i].OUT_W,
+            //                 &queue, &event);
+            // if (status == CLBlastSuccess) {
+            //     clWaitForEvents(1, &event);
+            // }
+
+            // cl_obj2mem(l[i].CL_OUTPUT, &l[i].OUTPUT, CL_MAP_WRITE,
+            //     l[i].N * l[i].OUT_H * l[i].OUT_W*l[i].XF);
+
 //debuging code
 // for(int rr = 0; rr<16; ++rr){
 //     printf("%f ",l[i].OUTPUT[rr * l[i].OUT_H * l[i].OUT_W + 0]);
@@ -412,7 +471,7 @@ void inference(LAYER *l,
 // for(int rr = 0; rr<96; ++rr){
 //     printf("%f ",l[i].OUTPUT[rr * l[i].OUT_H * l[i].OUT_W +55]);
 // }
-// if(i == 3){
+// if(i == 15){
 //     for(int rr = 0; rr<32; ++rr){
 //         printf("%f ",l[i].OUTPUT[rr * l[i].OUT_H * l[i].OUT_W + 0]);
 //     }

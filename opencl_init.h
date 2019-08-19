@@ -14,3 +14,10 @@ cl_command_queue queue;
 cl_program program;
 cl_event event;
 cl_int err;
+
+cl_mem cl_obj_create(cl_mem cl_obj, int m_size){
+    // printf("> def cl_mem ");
+    return clCreateBuffer(context, CL_MEM_READ_WRITE, m_size, NULL, &err);
+    // CHECK_ERROR(err);
+    // return cl_obj;
+}

@@ -90,6 +90,9 @@ typedef struct LAYER{
     cl_mem CL_BIAS;
     cl_mem CL_INPUT;
     cl_mem CL_OUTPUT;
+
+    cl_command_queue *QUE;
+    cl_event *EVT;
 #endif
 
 //TODO
@@ -121,9 +124,12 @@ extern void inference(LAYER *l,
 void im2col(float *in, float *out, 
             int C, int H, int W, 
             int KER, int stride, int pad);
-//donghee
 void cpu_gemv(float *A, float *B, float *C, int M, int N, int K);  
-void cpu_gemm(float *A, float *B, float *C, int M, int N, int K);
+// void cpu_gemm(float *A, float *B, float *C, int M, int N, int K);
+void gemm(LAYER *l, int i,
+          int ta, int tb,
+          int M, int N, int K,
+          float ALPHA, float BETA);
 void cpu_stride_b_gemm(float *A, float *B, float *C, 
                       int M, int N, int K,
                       int stride_b, int batch_count);
@@ -160,3 +166,6 @@ IplImage* image_read(char *img_file, float *image, int img_size);
 // void imagefile_read2( float *image, int img_size,int n);
 void image_show(float* box_output, IplImage *readimg);
 void image_free();
+void cl_obj2mem(cl_mem cl_obj, float** host_mem, 
+                cl_map_flags map_flag, int m_size);
+void mem2cl_obj(cl_mem cl_obj, float* host_mem);
