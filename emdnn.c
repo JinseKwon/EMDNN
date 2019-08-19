@@ -1,5 +1,8 @@
 #include "emdnn.h"
 #include <stdlib.h>
+//vscode 화면 뷰로 인함. 임시작성 배포시 삭제.
+#define OPENCL
+
 #ifdef OPENCL
 #include "opencl_init.h"
 #endif
@@ -24,6 +27,24 @@ float* file_loader(float* network, char *filename){
 
     return network;
 }
+#ifdef OPENCL
+cl_mem cl_obj_create(cl_mem cl_obj, int m_size){
+    return clCreateBuffer(context, CL_MEM_READ_WRITE, m_size, NULL, &err);
+    // CHECK_ERROR(err);
+    // return cl_obj;
+}
+//ABSTRATION of CL MAPPING FUNCTION 
+void cl_obj2mem(cl_mem cl_obj, float** host_mem, int m_size ){
+    *host_mem = (float*)clEnqueueMapBuffer(queue, cl_obj, CL_TRUE, CL_MAP_WRITE, 0,
+                                m_size, 0, NULL, NULL, &err);
+    CHECK_ERROR(err);
+}
+//ABSTRATION of CL UNMAPPING FUNCTION 
+void mem2cl_obj(cl_mem cl_obj, float* host_mem){
+    err = clEnqueueUnmapMemObject(queue, cl_obj, host_mem, 0, NULL, NULL);
+    CHECK_ERROR(err);
+}
+#endif
 void make_network(LAYER *l,
             float* net_weight, 
             int num,
@@ -75,22 +96,34 @@ void make_network(LAYER *l,
             l[i].OUT_W = (l[i].IN_W - l[i].W + 2*l[i].PAD) / l[i].STRIDE + 1;
 
 #ifdef OPENCL
-            l[i].CL_BIAS = clCreateBuffer(context, CL_MEM_READ_WRITE, 
-                                                l[i].N * l[i].SCALE * 
-                                                sizeof(float), NULL, &err);
-            l[i].BIAS = (float*)clEnqueueMapBuffer(queue, l[i].CL_BIAS, CL_TRUE, CL_MAP_WRITE, 0,
-                                                l[i].N * l[i].SCALE * 
-                                                sizeof(float), 0, NULL, NULL, &err);
+            //host memory mapping to CL OBJECT function
+            //cl_obj2mem( CL_OBJ, mem_arry, size)
+            l[i].CL_BIAS = 
+            cl_obj_create(l[i].CL_BIAS,
+                          l[i].N * l[i].SCALE * sizeof(float));
+            cl_obj2mem(   l[i].CL_BIAS, &l[i].BIAS, 
+                          l[i].N * l[i].SCALE * sizeof(float));
+            // l[i].CL_BIAS = clCreateBuffer(context, CL_MEM_READ_WRITE, 
+            //                                     l[i].N * l[i].SCALE * 
+            //                                     sizeof(float), NULL, &err);
+            // l[i].BIAS = (float*)clEnqueueMapBuffer(queue, l[i].CL_BIAS, CL_TRUE, CL_MAP_WRITE, 0,
+            //                                     l[i].N * l[i].SCALE * 
+            //                                     sizeof(float), 0, NULL, NULL, &err);
             memcpy( l[i].BIAS, net_weight,
                     l[i].N * l[i].SCALE *sizeof(float));
             net_weight += l[i].N * l[i].SCALE;
 
-            l[i].CL_WEIGHT = clCreateBuffer(context, CL_MEM_READ_WRITE, 
-                                                l[i].N * l[i].C * l[i].H * l[i].W *
-                                                sizeof(float), NULL, &err);
-            l[i].WEIGHT = (float*)clEnqueueMapBuffer(queue, l[i].CL_WEIGHT, CL_TRUE, CL_MAP_WRITE, 0,
-                                                l[i].N * l[i].C * l[i].H * l[i].W *
-                                                sizeof(float), 0, NULL, NULL, &err);
+            l[i].CL_WEIGHT = 
+            cl_obj_create(l[i].CL_WEIGHT, 
+                          l[i].N * l[i].C * l[i].H * l[i].W *sizeof(float));
+            cl_obj2mem(   l[i].CL_WEIGHT, &l[i].WEIGHT, 
+                          l[i].N * l[i].C * l[i].H * l[i].W *sizeof(float));
+            // l[i].CL_WEIGHT = clCreateBuffer(context, CL_MEM_READ_WRITE, 
+            //                                     l[i].N * l[i].C * l[i].H * l[i].W *
+            //                                     sizeof(float), NULL, &err);
+            // l[i].WEIGHT = (float*)clEnqueueMapBuffer(queue, l[i].CL_WEIGHT, CL_TRUE, CL_MAP_WRITE, 0,
+            //                                     l[i].N * l[i].C * l[i].H * l[i].W *
+            //                                     sizeof(float), 0, NULL, NULL, &err);
             memcpy( l[i].WEIGHT, net_weight,
                     l[i].N * l[i].C * l[i].H * l[i].W *sizeof(float));
             net_weight += l[i].N * l[i].C * l[i].H * l[i].W;
@@ -101,27 +134,38 @@ void make_network(LAYER *l,
 
             l[i].IM2COL = 0;
             if(l[i].W != 1){
-                l[i].CL_INPUT = clCreateBuffer(context, CL_MEM_READ_WRITE, 
-                                                l[i].IN_C * 
-                                                l[i].OUT_H * l[i].OUT_W * 
-                                                l[i].H * l[i].W * 
-                                                l[i].XF, NULL, &err);
-                l[i].INPUT = (float*)clEnqueueMapBuffer(queue, l[i].CL_INPUT, CL_TRUE, CL_MAP_WRITE, 0 ,
-                                                l[i].IN_C * 
-                                                l[i].OUT_H * l[i].OUT_W * 
-                                                l[i].H * l[i].W * 
-                                                l[i].XF, 0, NULL, NULL, &err);
-                CHECK_ERROR(err);
+                l[i].CL_INPUT =
+                cl_obj_create(l[i].CL_INPUT,
+                              l[i].IN_C * l[i].OUT_H * l[i].OUT_W * 
+                              l[i].H * l[i].W * l[i].XF);
+                cl_obj2mem(   l[i].CL_INPUT, &l[i].INPUT, 
+                              l[i].IN_C * l[i].OUT_H * l[i].OUT_W * 
+                              l[i].H * l[i].W * l[i].XF);
+                // l[i].CL_INPUT = clCreateBuffer(context, CL_MEM_READ_WRITE, 
+                //                                 l[i].IN_C * 
+                //                                 l[i].OUT_H * l[i].OUT_W * 
+                //                                 l[i].H * l[i].W * 
+                //                                 l[i].XF, NULL, &err);
+                // l[i].INPUT = (float*)clEnqueueMapBuffer(queue, l[i].CL_INPUT, CL_TRUE, CL_MAP_WRITE, 0 ,
+                //                                 l[i].IN_C * 
+                //                                 l[i].OUT_H * l[i].OUT_W * 
+                //                                 l[i].H * l[i].W * 
+                //                                 l[i].XF, 0, NULL, NULL, &err);
                 l[i].IM2COL = 1;
             }
-            l[i].CL_OUTPUT = clCreateBuffer(context, CL_MEM_READ_WRITE, 
-                                            l[i].OUT_C * 
-                                            l[i].OUT_H * l[i].OUT_W * 
-                                            l[i].XF, NULL, &err);
-            l[i].OUTPUT = (float*)clEnqueueMapBuffer(queue, l[i].CL_OUTPUT, CL_TRUE, CL_MAP_WRITE, 0 ,
-                                            l[i].OUT_C * 
-                                            l[i].OUT_H * l[i].OUT_W * 
-                                            l[i].XF, 0, NULL, NULL, &err);
+            l[i].CL_OUTPUT = 
+            cl_obj_create(l[i].CL_OUTPUT,
+                          l[i].OUT_C *l[i].OUT_H * l[i].OUT_W * l[i].XF);
+            cl_obj2mem(   l[i].CL_OUTPUT, &l[i].OUTPUT, 
+                          l[i].OUT_C *l[i].OUT_H * l[i].OUT_W * l[i].XF);
+            // l[i].CL_OUTPUT = clCreateBuffer(context, CL_MEM_READ_WRITE, 
+            //                                 l[i].OUT_C * 
+            //                                 l[i].OUT_H * l[i].OUT_W * 
+            //                                 l[i].XF, NULL, &err);
+            // l[i].OUTPUT = (float*)clEnqueueMapBuffer(queue, l[i].CL_OUTPUT, CL_TRUE, CL_MAP_WRITE, 0 ,
+            //                                 l[i].OUT_C * 
+            //                                 l[i].OUT_H * l[i].OUT_W * 
+            //                                 l[i].XF, 0, NULL, NULL, &err);
 #else
             l[i].BIAS   = net_weight; 
                           net_weight += l[i].N * l[i].SCALE;
@@ -329,6 +373,8 @@ void inference(LAYER *l,
             break;
 
         case CONVOLUTIONAL :
+//================================================================
+//TODO : GPU 코드 삽입해야 함 GPU 버전 또는 CPU 버전 선택가능해야함.
             if(l[i].IM2COL){
                 im2col( l[i-1].OUTPUT, l[i].INPUT,
                         l[i].IN_C, l[i].IN_H, l[i].IN_W,
@@ -361,6 +407,7 @@ void inference(LAYER *l,
 
             activate_function(l[i].OUTPUT, l[i].ACTIVATION,
                               l[i].OUT_C, l[i].OUT_H,l[i].OUT_W);
+//================================================================
 //debuging code
 // for(int rr = 0; rr<96; ++rr){
 //     printf("%f ",l[i].OUTPUT[rr * l[i].OUT_H * l[i].OUT_W +55]);

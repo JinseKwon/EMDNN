@@ -263,5 +263,5 @@ void detection(float *grid_cell,float* box_out,
                             det_CLASS,
                             iou_threshold);
 
-    //printf("\nfinal bounding box count =  %d\n",(int)box_out[13*13*5*6]);
+    printf("\nfinal bounding box count =  %d\n",(int)box_out[13*13*5*20*6]);
 }
