@@ -1,4 +1,4 @@
-OPENCL=1
+OPENCL=0
 CLBLAST=0
 OPENBLAS=0
 
@@ -21,7 +21,9 @@ TARGET=skeleton
 TAR_OBJS = skeleton.o
 TARGET2=alexnet
 TAR_OBJS2 = alexnet.o
- 
+TARGET3=vgg-16
+TAR_OBJS3=vgg-16.o
+
 $(TARGET): $(OBJS) $(TAR_OBJS)
 	$(CC) -o $(TARGET)  $(CFLAGS) $(TAR_OBJS)  $(OBJS) $(LIBS) $(DEF)
 	rm *.o
@@ -29,9 +31,16 @@ $(TARGET): $(OBJS) $(TAR_OBJS)
 $(TARGET2): $(OBJS) $(TAR_OBJS2)
 	$(CC) -o $(TARGET2) $(CFLAGS) $(TAR_OBJS2) $(OBJS) $(LIBS) $(DEF)
 	rm *.o
+$(TARGET3): $(OBJS) $(TAR_OBJS3)
+	$(CC) -o $(TARGET3) $(CFLAGS) $(TAR_OBJS3) $(OBJS) $(LIBS) $(DEF)
+	rm *.o
 
 alexnet.o : alexnet.c
 	$(CC) -c -o alexnet.o alexnet.c
+
+vgg-16.o : vgg-16.c
+	$(CC) -c -o vgg-16.o vgg-16.c
+
 
 skeleton.o : skeleton.c
 	$(CC) -c -o skeleton.o skeleton.c $(DEF)
@@ -52,4 +61,4 @@ image_io.o : image_io.c
 	$(CC) -c -o image_io.o image_io.c `pkg-config --cflags --libs opencv`
 
 clean :
-	rm *.o skeleton alexnet
+	rm *.o skeleton alexnet vgg-16

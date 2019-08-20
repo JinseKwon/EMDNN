@@ -1,7 +1,7 @@
 #include "emdnn.h"
 #include <stdlib.h>
 //vscode 화면 뷰로 인함. 임시작성 배포시 삭제.
-#define OPENCL
+//#define OPENCL
 
 #ifdef OPENCL
 #include "opencl_init.h"
