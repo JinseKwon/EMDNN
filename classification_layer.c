@@ -57,7 +57,9 @@ void quick_sort2(float* array, int start, int end, int* table){
 
 
 
-void classification(float *output_score,int class_num){
+void classification(float *output_score,
+                    int class_num, 
+                    int tune){
     int index_table[1000];
     for(int i = 0; i<1000; ++i){
         index_table[i] = i;
@@ -70,11 +72,11 @@ void classification(float *output_score,int class_num){
     // cvInitFont(&font_guide, CV_FONT_HERSHEY_DUPLEX, 1.0, 1.0, 0 ,3);//, 0, 1, CV_AA);
     // cvInitFont(&font_txt, CV_FONT_HERSHEY_SIMPLEX, 0.6, 0.6, 0 ,2);//, 0, 1, CV_AA);
 
-    printf("\n");
+    if(!tune) printf("\n");
     for(int i = 0; i<5; ++i){
         sprintf(text, "top%d :(idx : %d) %2.3f ( %s ) ",i,index_table[i], output_score[i]*100, class_name[index_table[i]] );
         // cvPutText(viewimg, text, cvPoint(10, 100+30*i), &font, CV_RGB(255,255,41));
-        printf("%s \n", text);
+        if(!tune) printf("%s \n", text);
     }
     // sprintf(text, "%.1f", 1/elapsed);//1/(get_time()-end_time));
     // cvPutText(viewimg, text, cvPoint(350, 50), &font_guide, CV_RGB(4, 255, 75));    //FPS val

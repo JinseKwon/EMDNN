@@ -165,7 +165,8 @@ void detection(float *grid_cell,float* box_out,
                int det_BOX,
                int det_CLASS,
                float score_threshold,
-               float iou_threshold){
+               float iou_threshold,
+               int tune){
 
     // float score_threshold = 0.3;
     // float iou_threshold = 0.3;
@@ -263,5 +264,5 @@ void detection(float *grid_cell,float* box_out,
                             det_CLASS,
                             iou_threshold);
 
-    printf("\nfinal bounding box count =  %d\n",(int)box_out[13*13*5*20*6]);
+    if(!tune)   printf("\nfinal bounding box count =  %d",(int)box_out[13*13*5*20*6]);
 }

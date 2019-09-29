@@ -16,6 +16,7 @@ typedef enum{
     CONVOLUTIONAL,
     CONVOLUTIONAL_DW,
     CONNECTED,
+    CONNECTED_T,
     MAXPOOL,
     SOFTMAX,
     AVGPOOL,
@@ -23,6 +24,13 @@ typedef enum{
     DETECTION,
     CLASSIFICATION
 }LAYER_TYPE;
+
+typedef enum{
+    CPU,
+    GPU,
+    NPU,
+    TUNE
+}DEVICE_TYPE;
 
 //layer print할때 enumerate 열거형 string 형태로 표기하기 위함
 // char lay_type[8][20] = { 
@@ -44,9 +52,12 @@ typedef enum{
 // struct person{
 //     int a;
 // };
+
 typedef struct LAYER{
     LAYER_TYPE TYPE;
     ACTIVATION_TYPE ACTIVATION;
+    DEVICE_TYPE DEVICE;
+    DEVICE_TYPE CUR_DEVICE;
 
     //layer index
     int NUM;
@@ -76,8 +87,8 @@ typedef struct LAYER{
     //im2col
     int IM2COL;
 
-    //opencl
-    int opencl_enable;
+    //if tuning flag = on/off
+    int TUNE;
 
     //DATA
     float* BIAS;
@@ -90,9 +101,17 @@ typedef struct LAYER{
     cl_mem CL_BIAS;
     cl_mem CL_INPUT;
     cl_mem CL_OUTPUT;
-
+    
+    //put in only layer 0 <== cl paramter 
     cl_command_queue *QUE;
     cl_event *EVT;
+    
+    cl_kernel *KER_IM2COL;
+    cl_kernel *KER_MAXPOOL;
+    cl_kernel *KER_BIAS;
+    cl_kernel *KER_RELU;
+    cl_kernel *KER_AVGPOOL;
+    
 #endif
 
 //TODO
@@ -111,9 +130,17 @@ extern LAYER* layer_update(
             LAYER *l,
             LAYER_TYPE type, 
             ACTIVATION_TYPE act,
+            DEVICE_TYPE device,
             int num, 
             int n, int c, int h, int w,
             int pad, int str, int scale);
+
+extern void prepare_mem(LAYER *l, int num,
+            DEVICE_TYPE pre_dev,
+            DEVICE_TYPE cur_dev);
+
+extern void tune_network(LAYER *l, 
+            int num);
 
 extern void print_network(LAYER *l, 
             int num);
@@ -121,12 +148,19 @@ extern void print_network(LAYER *l,
 extern void inference(LAYER *l, 
             int num);
 
-void im2col(float *in, float *out, 
+void im2col(LAYER *l, int i,
+            float *in, float *out, 
             int C, int H, int W, 
             int KER, int stride, int pad);
-void cpu_gemv(float *A, float *B, float *C, int M, int N, int K);  
+// void cpu_gemv(float *A, float *B, float *C, int M, int N, int K);  
 // void cpu_gemm(float *A, float *B, float *C, int M, int N, int K);
+void gemv(LAYER *l, int i,
+          float* A,    float* B,    float* C,
+          int ta,
+          int M, int N, int K,
+          float ALPHA, float BETA);
 void gemm(LAYER *l, int i,
+          float* A,    float* B,    float* C,
           int ta, int tb,
           int M, int N, int K,
           float ALPHA, float BETA);
@@ -137,17 +171,21 @@ void cpu_stride_b_gemm(float *A, float *B, float *C,
 float* input_bin_img(float* input, int C, int H, int W);
 void batch_normalizaiton(float *bias, float *weight, 
                          int K, int C, int H, int W);
-void bias_add(float* in, float* bias, 
+void bias_add(LAYER *l, int i,
+              float* in, float* bias, 
               int C, int H, int W);
-void softmax(float *in, float *out, int C);
-void activate_function(float* in, ACTIVATION_TYPE act, 
+void activate_function(LAYER *l, int i,
+                       float* in, ACTIVATION_TYPE act, 
                        int C, int H, int W);
-
+void softmax(float *in, float *out, int C);
 void transpose(float *INA, float *OUTA, 
                int ldx, int ldy);
-
-void maxpool(float *in, float *out, int H, int W, int C, int KER, int stride, int PAD);
-void avgpool(float *in, float *out, int H, int W, int C, int KER, int stride, int PAD);
+void transpose_fc(float *INA,
+               int ldx, int ldy);
+void maxpool(LAYER *l,  int i,
+             float *in, float *out, int C, int H, int W, int KER, int stride, int PAD);
+void avgpool(LAYER *l,  int i,
+             float *in, float *out, int C, int H, int W, int KER, int stride, int PAD);
 void detection(float *grid_cell,float* box_out,
                int input_width,
                int det_h,
@@ -155,9 +193,12 @@ void detection(float *grid_cell,float* box_out,
                int det_BOX,
                int det_CLASS,
                float score_threshold,
-               float iou_threshold);
+               float iou_threshold,
+               int tune);
 
-void classification(float *output_score, int class_num);//donghee
+void classification(float *output_score, 
+                    int class_num,
+                    int tune);//donghee
 
 // void cam_read(float *image, int img_size);
 IplImage* image_read(char *img_file, float *image, int img_size);
@@ -166,6 +207,12 @@ IplImage* image_read(char *img_file, float *image, int img_size);
 // void imagefile_read2( float *image, int img_size,int n);
 void image_show(float* box_output, IplImage *readimg);
 void image_free();
+
+#ifdef OPENCL
 void cl_obj2mem(cl_mem cl_obj, float** host_mem, 
                 cl_map_flags map_flag, int m_size);
-void mem2cl_obj(cl_mem cl_obj, float* host_mem);
+void mem2cl_obj(float* host_mem, cl_mem cl_obj);
+#endif
+
+//Now.. Timer function...
+double get_time();
