@@ -8,6 +8,7 @@ OPENBLAS_PATH=/home/shunya/OpenBLAS
 CC=g++
 CFLAGS= -g -W -Wall -O2
 OBJS=emdnn.o  blas.o detection_layer.o classification_layer.o image_io.o 
+SRCS=$(patsubst %.o, %.c, $(OBJS))
 LIBS=-lm `pkg-config --libs opencv`
 DEF=
 INC=
@@ -30,43 +31,48 @@ INC+= -I $(OPENBLAS_PATH)
 endif
 
 TARGET=skeleton
-TAR_OBJS = skeleton.o
+TAR_OBJS=skeleton.o
 TARGET2=alexnet
-TAR_OBJS2 = alexnet.o
+TAR_OBJS2=alexnet.o
 TARGET3=tinydark
-TAR_OBJS3 = tinydark.o
+TAR_OBJS3=tinydark.o
 TARGET4=vgg16
-TAR_OBJS4 = vgg16.o
+TAR_OBJS4=vgg16.o
+TARGET5=mobilenet
+TAR_OBJS5=mobilenet.o
 
-all: $(TARGET) $(TARGET2) $(TARGET3) $(TARGET4) 
+all: $(TARGET) $(TARGET2) $(TARGET3) $(TARGET4) $(TARGET5) 
 
 $(TARGET): $(OBJS) $(TAR_OBJS)
 	$(CC) -o $(TARGET)  $(CFLAGS) $(TAR_OBJS)  $(OBJS) $(LIBS) $(DEF) $(INC)
-	# rm *.o
 
 $(TARGET2): $(OBJS) $(TAR_OBJS2)
 	$(CC) -o $(TARGET2) $(CFLAGS) $(TAR_OBJS2) $(OBJS) $(LIBS) $(DEF) $(INC)
-	# rm *.o
 
 $(TARGET3): $(OBJS) $(TAR_OBJS3)
 	$(CC) -o $(TARGET3) $(CFLAGS) $(TAR_OBJS3) $(OBJS) $(LIBS) $(DEF) $(INC)
-	# rm *.o
 
 $(TARGET4): $(OBJS) $(TAR_OBJS4)
 	$(CC) -o $(TARGET4) $(CFLAGS) $(TAR_OBJS4) $(OBJS) $(LIBS) $(DEF) $(INC)
+
+$(TARGET5): $(OBJS) $(TAR_OBJS5)
+	$(CC) -o $(TARGET5) $(CFLAGS) $(TAR_OBJS5) $(OBJS) $(LIBS) $(DEF) $(INC)
 	# rm *.o
 
 alexnet.o : alexnet.c
-	$(CC) -c -o alexnet.o alexnet.c $(DEF)
+	$(CC) -c -o $@ $^ $(DEF)
 
 skeleton.o : skeleton.c
-	$(CC) -c -o skeleton.o skeleton.c $(DEF)
+	$(CC) -c -o $@ $^ $(DEF)
 
 tinydark.o : tinydark.c
-	$(CC) -c -o tinydark.o tinydark.c $(DEF)
+	$(CC) -c -o $@ $^ $(DEF)
 
 vgg16.o : vgg16.c
-	$(CC) -c -o vgg16.o vgg16.c $(DEF)
+	$(CC) -c -o $@ $^ $(DEF)
+
+mobilenet.o : mobilenet.c
+	$(CC) -c -o $@ $^ $(DEF)
 
 emdnn.o : emdnn.c
 	$(CC) -c -o emdnn.o emdnn.c $(DEF)  $(INC)
@@ -84,4 +90,4 @@ image_io.o : image_io.c
 	$(CC) -c -o image_io.o image_io.c `pkg-config --cflags --libs opencv` $(DEF)
 
 clean :
-	rm *.o skeleton alexnet tinydark vgg16
+	rm *.o $(TARGET) $(TARGET2) $(TARGET3) $(TARGET4) $(TARGET5)
