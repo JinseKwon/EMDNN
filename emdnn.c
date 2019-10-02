@@ -3,6 +3,7 @@
 
 //vscode 화면 뷰로 인함. 임시작성 배포시 삭제.
 // #define OPENCL
+// #define FILE_CHECK
 
 #ifdef OPENCL
 #include "opencl_init.h"
@@ -97,8 +98,8 @@ void make_network(LAYER *l,
     net_weight = file_loader(net_weight, filename);
 
     //TODO:Configuration
-    net_weight += 4;    
-    // int file_access = 4;
+    net_weight += 0;    
+    int file_access = 0;
 
     //weight to layer set
     for(int i = 0; i<num; ++i){
@@ -107,6 +108,9 @@ void make_network(LAYER *l,
             l[i].OUT_C = l[i].C;
             l[i].OUT_H = l[i].H;
             l[i].OUT_W = l[i].W;
+            net_weight += l[i].SCALE;
+            file_access += l[i].SCALE;
+
 #ifdef OPENCL
 
             l[i].CL_OUTPUT =
@@ -215,7 +219,9 @@ void make_network(LAYER *l,
                                           l[i].OUT_H * l[i].OUT_W * 
                                           l[i].XF);
 #endif
-            // file_access += l[i].N * l[i].SCALE + l[i].N * l[i].C * l[i].H * l[i].W;
+#ifdef FILE_CHECK
+            file_access += l[i].N * l[i].SCALE + l[i].N * l[i].C * l[i].H * l[i].W;
+#endif
             // printf("CONV making...\n");
             break;
 
@@ -228,10 +234,76 @@ void make_network(LAYER *l,
             l[i].OUT_H = (l[i].IN_H - l[i].H + 2*l[i].PAD) / l[i].STRIDE + 1;
             l[i].OUT_W = (l[i].IN_W - l[i].W + 2*l[i].PAD) / l[i].STRIDE + 1;
 
+
+#ifdef OPENCL
+            l[i].CL_BIAS = 
+            cl_obj_create(l[i].CL_BIAS,
+                          l[i].N * l[i].SCALE * l[i].XF);
+            cl_obj2mem(   l[i].CL_BIAS, &l[i].BIAS, CL_MAP_WRITE,
+                          l[i].N * l[i].SCALE * l[i].XF);
+
+            memcpy( l[i].BIAS, net_weight,
+                    l[i].N * l[i].SCALE * l[i].XF);
+            net_weight += l[i].N * l[i].SCALE;
+
+            l[i].CL_WEIGHT = 
+            cl_obj_create(l[i].CL_WEIGHT, 
+                          l[i].N * l[i].H * l[i].W * l[i].XF);
+            cl_obj2mem(   l[i].CL_WEIGHT, &l[i].WEIGHT, CL_MAP_WRITE,
+                          l[i].N * l[i].H * l[i].W * l[i].XF);
+
+            memcpy( l[i].WEIGHT, net_weight,
+                    l[i].N * l[i].H * l[i].W * l[i].XF);
+            net_weight += l[i].N * l[i].H * l[i].W;
+            if(l[i].SCALE != 1){
+                batch_normalizaiton(l[i].BIAS, l[i].WEIGHT, 
+                l[i].N, 1, l[i].H, l[i].W );
+            }
+
+            l[i].IM2COL = 0;
+            if(l[i].W != 1){
+                l[i].CL_INPUT =
+                cl_obj_create(l[i].CL_INPUT,
+                              l[i].IN_C * l[i].OUT_H * l[i].OUT_W * 
+                              l[i].H * l[i].W * l[i].XF);
+                cl_obj2mem(   l[i].CL_INPUT, &l[i].INPUT, CL_MAP_WRITE,
+                              l[i].IN_C * l[i].OUT_H * l[i].OUT_W * 
+                              l[i].H * l[i].W * l[i].XF);
+                l[i].IM2COL = 1;
+            }else{
+                l[i].CL_INPUT = 
+                cl_obj_create(l[i].CL_INPUT,
+                              l[i].IN_C * l[i].IN_H * l[i].IN_W * l[i].XF);
+                cl_obj2mem(   l[i].CL_INPUT, &l[i].INPUT, CL_MAP_WRITE,
+                              l[i].IN_C * l[i].IN_H * l[i].IN_W * l[i].XF);
+            }
+            l[i].CL_OUTPUT = 
+            cl_obj_create(l[i].CL_OUTPUT,
+                          l[i].OUT_C *l[i].OUT_H * l[i].OUT_W * l[i].XF);
+            cl_obj2mem(   l[i].CL_OUTPUT, &l[i].OUTPUT, CL_MAP_WRITE,
+                          l[i].OUT_C *l[i].OUT_H * l[i].OUT_W * l[i].XF);
+            
+            if(l[i].DEVICE == GPU){
+                mem2cl_obj(l[i].BIAS, l[i].CL_BIAS);
+                mem2cl_obj(l[i].WEIGHT, l[i].CL_WEIGHT);
+                if(l[i].IM2COL){
+                    mem2cl_obj(l[i].INPUT, l[i].CL_INPUT);
+                }
+                mem2cl_obj(l[i].OUTPUT, l[i].CL_OUTPUT);
+            }else if(l[i].DEVICE == CPU){
+                break;
+            }else if(l[i].DEVICE == NPU){
+                break;
+            }
+#else
             l[i].BIAS   = net_weight; 
                           net_weight += l[i].N * l[i].SCALE;
             l[i].WEIGHT = net_weight; 
                           net_weight += l[i].N * l[i].H * l[i].W;
+            if(l[i].SCALE != 1){
+                batch_normalizaiton(l[i].BIAS, l[i].WEIGHT, 
+                l[i].N, 1, l[i].H, l[i].W );
+            }
 
             l[i].IM2COL = 0;
             if(l[i].W != 1){
@@ -244,8 +316,11 @@ void make_network(LAYER *l,
             l[i].OUTPUT = (float*)malloc(l[i].OUT_C * 
                                          l[i].OUT_H * l[i].OUT_W * 
                                          l[i].XF);
+#endif
 
-            // file_access += l[i].N * l[i].SCALE + l[i].N * l[i].H * l[i].W;
+#ifdef FILE_CHECK
+            file_access += l[i].N * l[i].SCALE + l[i].N * l[i].H * l[i].W;
+#endif
             break;
 
         case CONNECTED_T :
@@ -316,7 +391,9 @@ void make_network(LAYER *l,
             }
             l[i].OUTPUT = (float*)malloc(l[i].N * l[i].XF);
 #endif
-            // file_access += l[i].N * l[i].SCALE + l[i].N * l[i].C;
+#ifdef FILE_CHECK
+            file_access += l[i].N * l[i].SCALE + l[i].N * l[i].C;
+#endif
             break;
 
         case MAXPOOL:
@@ -420,7 +497,9 @@ void make_network(LAYER *l,
         default :
             return;
         }
-        // printf("file access : %d / %d \n", file_access*4, 17015472);
+#ifdef FILE_CHECK
+        printf("file access : %d / %d \n", file_access*4, 17015472);
+#endif
     }
 }
 
@@ -452,9 +531,9 @@ void tune_parameter(LAYER *l,
             else if(l[i].CUR_DEVICE == GPU){
                 if(      l[i].DEVICE == CPU){
                     cl_obj2mem(   l[i].CL_BIAS, &l[i].BIAS, CL_MAP_WRITE,
-                          l[i].N * l[i].SCALE * l[i].XF);
+                                  l[i].N * l[i].SCALE * l[i].XF);
                     cl_obj2mem(   l[i].CL_WEIGHT, &l[i].WEIGHT, CL_MAP_WRITE,
-                                l[i].N * l[i].C * l[i].H * l[i].W * l[i].XF);
+                                  l[i].N * l[i].C * l[i].H * l[i].W * l[i].XF);
                     if(l[i].IM2COL == 1){
                         cl_obj2mem(   l[i].CL_INPUT, &l[i].INPUT, CL_MAP_WRITE,
                                     l[i].IN_C * l[i].OUT_H * l[i].OUT_W * 
@@ -474,7 +553,49 @@ void tune_parameter(LAYER *l,
 
                 }
             }
+            break;
         case CONVOLUTIONAL_DW :
+            if(l[i].CUR_DEVICE == CPU){
+#ifdef OPENCL
+                if(      l[i].DEVICE == GPU){
+                    mem2cl_obj(l[i].BIAS, l[i].CL_BIAS);
+                    mem2cl_obj(l[i].WEIGHT, l[i].CL_WEIGHT);
+                    if(l[i].IM2COL){
+                        mem2cl_obj(l[i].INPUT, l[i].CL_INPUT);
+                    }
+                    mem2cl_obj(l[i].OUTPUT, l[i].CL_OUTPUT);
+                }else 
+#endif
+                if(l[i].DEVICE == NPU){
+
+                }
+            }
+#ifdef OPENCL
+            else if(l[i].CUR_DEVICE == GPU){
+                if(      l[i].DEVICE == CPU){
+                    cl_obj2mem(   l[i].CL_BIAS, &l[i].BIAS, CL_MAP_WRITE,
+                                  l[i].N * l[i].SCALE * l[i].XF);
+                    cl_obj2mem(   l[i].CL_WEIGHT, &l[i].WEIGHT, CL_MAP_WRITE,
+                                  l[i].N * l[i].H * l[i].W * l[i].XF);
+                    if(l[i].IM2COL == 1){
+                        cl_obj2mem(   l[i].CL_INPUT, &l[i].INPUT, CL_MAP_WRITE,
+                                    l[i].IN_C * l[i].OUT_H * l[i].OUT_W * 
+                                    l[i].H * l[i].W * l[i].XF);
+                    }
+                    cl_obj2mem(   l[i].CL_OUTPUT, &l[i].OUTPUT, CL_MAP_WRITE,
+                                l[i].OUT_C *l[i].OUT_H * l[i].OUT_W * l[i].XF);
+                }else if(l[i].DEVICE == NPU){
+
+                }
+            }
+#endif
+            else if(l[i].CUR_DEVICE == NPU){
+                if(      l[i].DEVICE == CPU){
+                
+                }else if(l[i].DEVICE == GPU){
+
+                }
+            }
             break;
 
         case CONNECTED_T :
@@ -839,22 +960,42 @@ void inference(LAYER *l,
             break;
 
         case CONVOLUTIONAL_DW :
+            tic = get_time();
             if(l[i].IM2COL){
-                im2col( l, i,
-                        l[i-1].OUTPUT, l[i].INPUT,
-                        l[i].IN_C, l[i].IN_H, l[i].IN_W, 
-                        l[i].W,
-                        l[i].STRIDE, l[i].PAD);
+                im2col(l, i,
+                       l[i-1].OUTPUT, l[i].INPUT,
+                       l[i].IN_C, l[i].IN_H, l[i].IN_W,
+                       l[i].W,
+                       l[i].STRIDE, l[i].PAD);
+                depth_gemm(l, i,
+                           l[i].WEIGHT, l[i].INPUT, l[i].OUTPUT,
+                           0, 0,
+                           l[i].IN_C,
+                           l[i].OUT_H * l[i].OUT_W,
+                           l[i].H*l[i].W,
+                           l[i].H*l[i].W,   //offset
+                           1.0f, 0.0f);
             }else{
-                l[i].INPUT = l[i-1].OUTPUT;
-                // printf("memory leak? ");
+                depth_gemm(l, i,
+                           l[i].WEIGHT, l[i-1].OUTPUT, l[i].OUTPUT,
+                           0, 0,
+                           l[i].IN_C,
+                           l[i].OUT_H * l[i].OUT_W,
+                           l[i].H*l[i].W,
+                           l[i].H*l[i].W,   //offset
+                           1.0f, 0.0f);
+                // depthwise_conv(l[i].WEIGHT, l[i].INPUT, l[i].OUTPUT,
+                //            l[i].IN_C, l[i].OUT_H*l[i].OUT_W, l[i].H *l[i].W, 
+                //            l[i].H*l[i].W);
             }
-            cpu_stride_b_gemm(l[i].WEIGHT, l[i].INPUT, l[i].OUTPUT,
-                l[i].OUT_H * l[i].OUT_W,
-                l[i].OUT_C,
-                l[i].N * l[i].H * l[i].W,
-                l[i].H * l[i].W, 
-                l[i].N);
+            bias_add(l, i,
+                     l[i].OUTPUT,l[i].BIAS,
+                     l[i].OUT_C, l[i].OUT_H,l[i].OUT_W);
+
+            activate_function(l, i,
+                              l[i].OUTPUT, l[i].ACTIVATION,
+                              l[i].OUT_C, l[i].OUT_H,l[i].OUT_W);
+            if(l[i].TUNE) printf(" %.3f",get_time()-tic);
             break;
 
         case CONNECTED_T :

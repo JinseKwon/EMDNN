@@ -164,9 +164,15 @@ void gemm(LAYER *l, int i,
           int ta, int tb,
           int M, int N, int K,
           float ALPHA, float BETA);
-void cpu_stride_b_gemm(float *A, float *B, float *C, 
-                      int M, int N, int K,
-                      int stride_b, int batch_count);
+void depth_gemm(LAYER *l, int i,
+          float* A,    float* B,    float* C,
+          int ta, int tb,
+          int M, int N, int K,
+          int offset,
+          float ALPHA, float BETA);
+// void depthwise_conv(float *A, float *B, float *C, 
+//                       int M, int N, int K,
+//                       int offsetA);
 
 float* input_bin_img(float* input, int C, int H, int W);
 void batch_normalizaiton(float *bias, float *weight, 
@@ -201,7 +207,8 @@ void classification(float *output_score,
                     int tune);//donghee
 
 // void cam_read(float *image, int img_size);
-IplImage* image_read(char *img_file, float *image, int img_size);
+IplImage* image_read(char *img_file, float *image, int img_size,
+                     float mean_r,   float mean_g, float mean_b);
 
 // void imagefile_read( float *image, int img_size, char *filename);
 // void imagefile_read2( float *image, int img_size,int n);

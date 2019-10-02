@@ -51,7 +51,8 @@ const char color_map[20][3] ={  {204,23,134},{153,63,118},{171,4,255},{255,251,1
 //     //===========================//
 //     // cvReleaseImage(&input_img);
 // }
-IplImage* image_read(char *img_file, float *image, int img_size){   
+IplImage* image_read(char *img_file, float *image, int img_size,
+                     float mean_r,   float mean_g, float mean_b){   
     //  input_img = cvLoadImage("images/dog.jpg");    
     IplImage *input_img = cvLoadImage(img_file); 
     IplImage *readimg = cvCreateImage(cvSize(img_size,img_size),IPL_DEPTH_8U,3);
@@ -79,10 +80,13 @@ IplImage* image_read(char *img_file, float *image, int img_size){
     int img_padding = readimg->widthStep;
     
     for(int h =0; h<img_size; ++h){
-        for(int c = 0; c<3; c++){
-            for(int w =0; w<img_size; ++w){
-                image[c*img_size*img_size + h*img_size + w] = imgs[ h*img_padding + w*3 + c] / 255.;
-            }
+        for(int w =0; w<img_size; ++w){
+            // for(int c = 0; c<3; c++){
+            //     image[c*img_size*img_size + h*img_size + w] = imgs[ h*img_padding + w*3 + c] / 255.;
+            image[0*img_size*img_size + h*img_size + w] = (imgs[ h*img_padding + w*3 + 0]-mean_r)/ 255.;
+            image[1*img_size*img_size + h*img_size + w] = (imgs[ h*img_padding + w*3 + 1]-mean_g)/ 255.;
+            image[2*img_size*img_size + h*img_size + w] = (imgs[ h*img_padding + w*3 + 2]-mean_b)/ 255.;
+            // }
         }
     }
     // free(imgs);

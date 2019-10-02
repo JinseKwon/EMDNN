@@ -10,7 +10,7 @@ int main(){
     int i = 0;
     //       LAYER, LAYER_TYPE,    ACTIVATION,  dev, num,   N,   C,H-r,W-s, PAD,STR,SCALE
     //input
-    l=layer_update(l, INPUT_LAYER     , LINEAR, CPU, i++,   0,   3,227,227, 0  ,  0,   0);
+    l=layer_update(l, INPUT_LAYER     , LINEAR, CPU, i++,   0,   3,227,227, 0  ,  0,   4);
     //CONV
     l=layer_update(l, CONVOLUTIONAL   , RELU  , GPU, i++,  96,   3, 11, 11, 0  ,  4,   1);
     l=layer_update(l, MAXPOOL         , LINEAR, GPU, i++,   0,   0,  3,  3, 0  ,  2,   0);
@@ -34,8 +34,8 @@ int main(){
     tune_network(l,num_layer);
 
     print_network(l,num_layer);
-    for(int rr =0 ; rr <1; ++rr){
-        IplImage *cvimg = image_read(img_name, l[0].OUTPUT, l[0].W);
+    for(int rr =0 ; rr <4; ++rr){
+        IplImage *cvimg = image_read(img_name, l[0].OUTPUT, l[0].W, 0.0f, 0.0f, 0.0f);
         
         double tic = get_time();
         

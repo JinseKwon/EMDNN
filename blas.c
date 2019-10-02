@@ -90,41 +90,47 @@ void cpu_gemm(float *A, float *B, float *C,
     // }
     //printf(" > cpu_gemm ");
 }
-void cpu_stride_b_gemm(float *A, float *B, float *C, 
-                      int M, int N, int K,
-                      int stride_b, int batch_count){
+void cpu_depthwise_conv(float *A, float *B, float *C, 
+                    int M, int N, int K,
+                    int offset){
     for(int m = 0; m < M; ++m){
         for(int n = 0; n < N; ++n){
             float sum = 0;
-            for(int bat = 0; bat < batch_count; ++bat){
-                for(int k = 0; k < stride_b; ++k){
-                    sum += A[m*K+k] * B[bat*stride_b*N + k*N + n];
-                }
+            for(int k=0; k<K; ++k){
+                sum += A[m*K+k] * B[m*offset*N + k*N + n];
             }
-            C[m*N+n] = sum;
+            C[m*N + n] = sum;
         }
     }
-    //printf(" > str_gemm ");
+    // printf(" > str_gemm ");
 }
-void gemv(LAYER *l, int i,
+void depth_gemm(LAYER *l, int i,
           float* A,    float* B,    float* C,
-          int ta,
+          int ta, int tb,
           int M, int N, int K,
+          int OFFSET,
           float ALPHA, float BETA){
     if(l[i].DEVICE == GPU){
 #ifdef CLBLAST
-        cl_mem cl_A = l[i  ].CL_WEIGHT; 
-        cl_mem cl_B = l[i-1].CL_OUTPUT;
-        cl_mem cl_C = l[i  ].CL_OUTPUT;
+        cl_mem cl_A = l[i].CL_WEIGHT; 
+        cl_mem cl_B;
+        cl_mem cl_C = l[i].CL_OUTPUT;
+        if(l[i].IM2COL){
+            cl_B = l[i].CL_INPUT;
+        }else{
+            cl_B = l[i-1].CL_OUTPUT;
+        }
         CLBlastStatusCode status;
-        status = CLBlastSgemv(CLBlastLayoutRowMajor,
-                        CLBlastTransposeNo,
-                        M, K,
+        status = CLBlastSgemmStridedBatched(
+                        CLBlastLayoutRowMajor,
+                        CLBlastTransposeNo, CLBlastTransposeNo,
+                        1, N, K,
                         1.0f,
-                        cl_A, 0, K,
-                        cl_B, 0, 1,
+                        cl_A, 0, K, K,
+                        cl_B, 0, N, K*N,
                         0.0f,
-                        cl_C, 0, 1,
+                        cl_C, 0, N, N,
+                        M,
                         l[0].QUE, l[0].EVT);
         if (status == CLBlastSuccess) {
         clWaitForEvents(1, l[0].EVT);
@@ -132,20 +138,25 @@ void gemv(LAYER *l, int i,
 #endif
     }else if(l[i].DEVICE == CPU){
 #ifdef OPENBLAS
-    cblas_sgemv(CblasRowMajor,
-                CblasNoTrans,
-                M, K,
-                ALPHA,
-                A, K,
-                B, 1,
-                BETA,
-                C, 1);
+        for(int itr=0;itr<M; ++itr){
+            cblas_sgemm(CblasRowMajor,
+                        CblasNoTrans, CblasNoTrans,
+                        1, N, K,
+                        1.0f,
+                        A+(itr*K), K,
+                        B+(itr*K*N), N,
+                        0.0f,
+                        C+(itr*N), N);
+        }
 #else
-    cpu_gemv(A,B,C,
-             M,N,K);
+        cpu_depthwise_conv(A, B, C,
+                        M, N, K, 
+                        OFFSET);
 #endif
     }
+    if(!l[i].TUNE)    printf(" > depth_c ");
 }
+
 void gemm(LAYER *l, int i,
           float* A,    float* B,    float* C,
           int ta, int tb,
@@ -188,7 +199,7 @@ void gemm(LAYER *l, int i,
                 M, N, K,
                 1.0f,
                 A, K,
-                B , N,
+                B, N,
                 0.0f,
                 C, N);
 #else
@@ -196,7 +207,51 @@ void gemm(LAYER *l, int i,
              M, N, K);
 #endif
     }
+    if(!l[i].TUNE)    printf(" > gemm ");
 }
+
+void gemv(LAYER *l, int i,
+          float* A,    float* B,    float* C,
+          int ta,
+          int M, int N, int K,
+          float ALPHA, float BETA){
+    if(l[i].DEVICE == GPU){
+#ifdef CLBLAST
+        cl_mem cl_A = l[i  ].CL_WEIGHT; 
+        cl_mem cl_B = l[i-1].CL_OUTPUT;
+        cl_mem cl_C = l[i  ].CL_OUTPUT;
+        CLBlastStatusCode status;
+        status = CLBlastSgemv(CLBlastLayoutRowMajor,
+                        CLBlastTransposeNo,
+                        M, K,
+                        1.0f,
+                        cl_A, 0, K,
+                        cl_B, 0, 1,
+                        0.0f,
+                        cl_C, 0, 1,
+                        l[0].QUE, l[0].EVT);
+        if (status == CLBlastSuccess) {
+        clWaitForEvents(1, l[0].EVT);
+        }
+#endif
+    }else if(l[i].DEVICE == CPU){
+#ifdef OPENBLAS
+    cblas_sgemv(CblasRowMajor,
+                CblasNoTrans,
+                M, K,
+                ALPHA,
+                A, K,
+                B, 1,
+                BETA,
+                C, 1);
+#else
+    cpu_gemv(A,B,C,
+             M,N,K);
+#endif
+    }
+    if(!l[i].TUNE)    printf(" > gemv ");
+}
+
 //im2col은 >> CONV 시   weight * input으로 처리하도록 수정해야함.
 // ex) input CHW로 들어오도록 처리해야함 (OpenCV는 HWC로 들어옴..)
 // 따라서 Weight * Input으로 처리해야 darknet, CAFFE NCHW로 구성되어 있으므로 
