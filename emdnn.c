@@ -10,6 +10,10 @@
 
 #include <clblast_c.h>
 #endif
+// #ifdef NNPACK
+// #include <nnpack.h>
+// pthreadpool_t threadpool = pthreadpool_create(4);
+// #endif
 
 // float* file_loader(float* network, int f_size, char *filename){
 float* file_loader(float* network, char *filename){
@@ -93,7 +97,10 @@ void make_network(LAYER *l,
     l[0].KER_AVGPOOL = &kernel5;
 
 #endif
-
+#ifdef NNPACK
+    nnp_initialize();
+    l[0].PTHREAD = pthreadpool_create(4);
+#endif
     //weight loader
     net_weight = file_loader(net_weight, filename);
 
@@ -191,7 +198,7 @@ void make_network(LAYER *l,
                     mem2cl_obj(l[i].INPUT, l[i].CL_INPUT);
                 }
                 mem2cl_obj(l[i].OUTPUT, l[i].CL_OUTPUT);
-            }else if(l[i].DEVICE == CPU){
+            }else if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 break;
             }else if(l[i].DEVICE == NPU){
                 break;
@@ -290,7 +297,7 @@ void make_network(LAYER *l,
                     mem2cl_obj(l[i].INPUT, l[i].CL_INPUT);
                 }
                 mem2cl_obj(l[i].OUTPUT, l[i].CL_OUTPUT);
-            }else if(l[i].DEVICE == CPU){
+            }else if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 break;
             }else if(l[i].DEVICE == NPU){
                 break;
@@ -369,7 +376,7 @@ void make_network(LAYER *l,
                 mem2cl_obj(l[i].BIAS, l[i].CL_BIAS);
                 mem2cl_obj(l[i].WEIGHT, l[i].CL_WEIGHT);
                 mem2cl_obj(l[i].OUTPUT, l[i].CL_OUTPUT);
-            }else if(l[i].DEVICE == CPU){
+            }else if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 break;
             }else if(l[i].DEVICE == NPU){
                 break;
@@ -418,7 +425,7 @@ void make_network(LAYER *l,
             if(l[i].DEVICE == GPU){
                 mem2cl_obj(l[i].OUTPUT, l[i].CL_OUTPUT);
                 break;
-            }else if(l[i].DEVICE == CPU){
+            }else if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 break;
             }else if(l[i].DEVICE == NPU){
                 break;
@@ -459,7 +466,7 @@ void make_network(LAYER *l,
             if(l[i].DEVICE == GPU){
                 mem2cl_obj(l[i].OUTPUT, l[i].CL_OUTPUT);
                 break;
-            }else if(l[i].DEVICE == CPU){
+            }else if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 break;
             }else if(l[i].DEVICE == NPU){
                 break;
@@ -512,7 +519,7 @@ void tune_parameter(LAYER *l,
             break;
 
         case CONVOLUTIONAL :
-            if(l[i].CUR_DEVICE == CPU){
+            if(l[i].CUR_DEVICE == CPU || l[i].CUR_DEVICE == PPU){
 #ifdef OPENCL
                 if(      l[i].DEVICE == GPU){
                     mem2cl_obj(l[i].BIAS, l[i].CL_BIAS);
@@ -529,7 +536,7 @@ void tune_parameter(LAYER *l,
             }
 #ifdef OPENCL
             else if(l[i].CUR_DEVICE == GPU){
-                if(      l[i].DEVICE == CPU){
+                if(      l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                     cl_obj2mem(   l[i].CL_BIAS, &l[i].BIAS, CL_MAP_WRITE,
                                   l[i].N * l[i].SCALE * l[i].XF);
                     cl_obj2mem(   l[i].CL_WEIGHT, &l[i].WEIGHT, CL_MAP_WRITE,
@@ -547,7 +554,7 @@ void tune_parameter(LAYER *l,
             }
 #endif
             else if(l[i].CUR_DEVICE == NPU){
-                if(      l[i].DEVICE == CPU){
+                if(      l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 
                 }else if(l[i].DEVICE == GPU){
 
@@ -555,7 +562,7 @@ void tune_parameter(LAYER *l,
             }
             break;
         case CONVOLUTIONAL_DW :
-            if(l[i].CUR_DEVICE == CPU){
+            if(l[i].CUR_DEVICE == CPU || l[i].CUR_DEVICE == PPU){
 #ifdef OPENCL
                 if(      l[i].DEVICE == GPU){
                     mem2cl_obj(l[i].BIAS, l[i].CL_BIAS);
@@ -572,7 +579,7 @@ void tune_parameter(LAYER *l,
             }
 #ifdef OPENCL
             else if(l[i].CUR_DEVICE == GPU){
-                if(      l[i].DEVICE == CPU){
+                if(      l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                     cl_obj2mem(   l[i].CL_BIAS, &l[i].BIAS, CL_MAP_WRITE,
                                   l[i].N * l[i].SCALE * l[i].XF);
                     cl_obj2mem(   l[i].CL_WEIGHT, &l[i].WEIGHT, CL_MAP_WRITE,
@@ -590,7 +597,7 @@ void tune_parameter(LAYER *l,
             }
 #endif
             else if(l[i].CUR_DEVICE == NPU){
-                if(      l[i].DEVICE == CPU){
+                if(      l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 
                 }else if(l[i].DEVICE == GPU){
 
@@ -600,7 +607,7 @@ void tune_parameter(LAYER *l,
 
         case CONNECTED_T :
         case CONNECTED :
-            if(l[i].CUR_DEVICE == CPU){
+            if(l[i].CUR_DEVICE == CPU || l[i].CUR_DEVICE == PPU){
 #ifdef OPENCL
                 if(      l[i].DEVICE == GPU){
                     mem2cl_obj(l[i].BIAS, l[i].CL_BIAS);
@@ -614,7 +621,7 @@ void tune_parameter(LAYER *l,
             }
 #ifdef OPENCL
             else if(l[i].CUR_DEVICE == GPU){
-                if(      l[i].DEVICE == CPU){
+                if(      l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                     cl_obj2mem(   l[i].CL_BIAS, &l[i].BIAS, CL_MAP_WRITE,
                           l[i].N * l[i].SCALE * l[i].XF);
                     cl_obj2mem(   l[i].CL_WEIGHT, &l[i].WEIGHT, CL_MAP_WRITE,
@@ -627,7 +634,7 @@ void tune_parameter(LAYER *l,
             }
 #endif
             else if(l[i].CUR_DEVICE == NPU){
-                if(      l[i].DEVICE == CPU){
+                if(      l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 
                 }else if(l[i].DEVICE == GPU){
 
@@ -637,7 +644,7 @@ void tune_parameter(LAYER *l,
             break;
 
         case MAXPOOL:
-            if(l[i].CUR_DEVICE == CPU){
+            if(l[i].CUR_DEVICE == CPU || l[i].CUR_DEVICE == PPU){
 #ifdef OPENCL
                 if(      l[i].DEVICE == GPU){
                     mem2cl_obj(l[i].OUTPUT, l[i].CL_OUTPUT);
@@ -649,7 +656,7 @@ void tune_parameter(LAYER *l,
             }
 #ifdef OPENCL
             else if(l[i].CUR_DEVICE == GPU){
-                if(      l[i].DEVICE == CPU){
+                if(      l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                     cl_obj2mem(   l[i].CL_OUTPUT, &l[i].OUTPUT, CL_MAP_WRITE,
                                 l[i].OUT_C * l[i].OUT_H * l[i].OUT_W * 
                                 l[i].XF);
@@ -659,7 +666,7 @@ void tune_parameter(LAYER *l,
             }
 #endif
             else if(l[i].CUR_DEVICE == NPU){
-                if(      l[i].DEVICE == CPU){
+                if(      l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 
                 }else if(l[i].DEVICE == GPU){
 
@@ -669,7 +676,7 @@ void tune_parameter(LAYER *l,
         case SOFTMAX :
             break;
         case AVGPOOL :
-            if(l[i].CUR_DEVICE == CPU){
+            if(l[i].CUR_DEVICE == CPU || l[i].CUR_DEVICE == PPU){
 #ifdef OPENCL
                 if(l[i].DEVICE == GPU){
                     mem2cl_obj(l[i].OUTPUT, l[i].CL_OUTPUT);
@@ -681,7 +688,7 @@ void tune_parameter(LAYER *l,
             }
 #ifdef OPENCL
             else if(l[i].CUR_DEVICE == GPU){
-                if(      l[i].DEVICE == CPU){
+                if(      l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                     cl_obj2mem( l[i].CL_OUTPUT, &l[i].OUTPUT, CL_MAP_WRITE,
                                 l[i].OUT_C * l[i].OUT_H * l[i].OUT_W * 
                                 l[i].XF);
@@ -691,7 +698,7 @@ void tune_parameter(LAYER *l,
             }
 #endif
             else if(l[i].CUR_DEVICE == NPU){
-                if(      l[i].DEVICE == CPU){
+                if(      l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 
                 }else if(l[i].DEVICE == GPU){
 
@@ -750,15 +757,15 @@ void tune_network(LAYER *l,
         "maxpool  ",    "softmax  ",    "avgpool  ",    "shortcut ",
         "detection",    "classify "
     };
-    char dev_type[3][20] = { 
-        " CPU "," GPU ", " NPU "
+    char dev_type[4][20] = { 
+        " CPU "," GPU ", " NPU "," PPU "
     };
     
     double tic;
     double minimum = 1000.0;
     int    min_para = -1;
 
-    int iter = 2049;
+    int iter = 50;
     int start_layer = 0;
     int end_layer = 0;
     for(int iii = 0; iii<l[0].C * l[0].H * l[0].W; ++iii){
@@ -768,6 +775,9 @@ void tune_network(LAYER *l,
     printf("  ");
     for(int i=0; i<num; ++i){
         l[i].TUNE = 1;
+        l[i].TIME_CPU = 1000.f;
+        l[i].TIME_GPU = 1000.f;
+        l[i].TIME_PPU = 1000.f;
         l[i].DEVICE = CPU;
         printf("%c%c ",lay_type[l[i].TYPE][0],
                        lay_type[l[i].TYPE][1]);
@@ -790,8 +800,30 @@ void tune_network(LAYER *l,
     
     inference(l,num);
     printf("\n");
-    //tuning iteration stage
+    
+    //4 bit map
+    // - 1 undefined device ==> first layer
+    // 10 itr / DEVICE
+    // if CNT == 30          ==> all layer scan
+    // ==> then fast device select
+    //=================================================================
+    //CNT | CPU | GPU | PPU
+    // -1 |time |time |time 
+    // -1 |time |time |time 
+    // -1 |time |time |time 
+    //=================================================================
+    int* dynamicMap   = (int *)malloc((end_layer - start_layer + 1) * 
+                                       4 * sizeof(int));
+    int  dynamicRange = end_layer - start_layer + 1;
+    DEVICE_TYPE SEL_DEV[3] = {CPU,GPU,PPU};
+    for(int init=0; init<dynamicRange; ++init){
+        dynamicMap[init*4 + 0] = 0;
+        dynamicMap[init*4 + 1] = 0;
+        dynamicMap[init*4 + 2] = 0;
+        dynamicMap[init*4 + 3] = 0;
+    }
 
+    //tuning iteration stage
     for(int k=0; k < iter+1; ++k){
         
         int bit_vec = k;
@@ -803,7 +835,34 @@ void tune_network(LAYER *l,
         printf("%d %c", k,dev_type[l[0].DEVICE][1]);
         
         //device tuning
-        for(int rnd = start_layer-1; rnd <end_layer; ++rnd){
+        for(int rnd = start_layer; rnd < end_layer + 1; ++rnd){
+            if(dynamicMap[(rnd-start_layer) * 4 + 0] >= 50){
+                //TODO:tuning stage reset...
+                
+                double min = l[rnd].TIME_CPU;
+                int    sel = 0;
+                    
+                if(l[rnd].TIME_GPU < min){
+                    sel = 1;
+                    min = l[rnd].TIME_GPU;
+                }
+                if(l[rnd].TIME_PPU < min){
+                    sel = 2;
+                    min = l[rnd].TIME_PPU;
+                }
+                l[rnd].DEVICE = SEL_DEV[sel];
+            }
+            else if(dynamicMap[(rnd-start_layer) * 4 + 0] <= 30){
+                l[rnd].DEVICE = SEL_DEV[ (rnd+k) % 3 ];
+                dynamicMap[(rnd-start_layer)*4 + ((rnd+k) % 3)+1] += 1;
+                dynamicMap[(rnd-start_layer)*4 + 0         ] += 1;
+            }else{
+                l[rnd].DEVICE = SEL_DEV[ (k) % 3 ];
+                dynamicMap[(rnd-start_layer)*4 + ((k) % 3)+1] += 1;
+                dynamicMap[(rnd-start_layer)*4 + 0         ] += 1;
+            }
+
+/*******bit brute force
             //전반부
             if(k<1024){
                 int bitmap = (bit_vec) << (start_layer-1);
@@ -818,7 +877,8 @@ void tune_network(LAYER *l,
             }
             // if(l[rnd].TYPE == SOFTMAX) l[rnd].DEVICE = CPU;
             // l[rnd].DEVICE = GPU;
-            printf("%c",dev_type[l[rnd+1].DEVICE][1]);
+*********/
+            printf("%c",dev_type[l[rnd].DEVICE][1]);
         }
         for(int rnd = end_layer+1; rnd<num; rnd++){
             printf("%c", dev_type[l[num-1].DEVICE][1]);
@@ -830,12 +890,18 @@ void tune_network(LAYER *l,
         
         tic = get_time()-tic;
         printf(" %.6f\n", tic);
-        if(minimum > tic){ 
-            minimum = tic;
-            min_para = k;
-        }
+        
+        // if(minimum > tic){ 
+        //     minimum = tic;
+        //     min_para = k;
+        // }
     }
-    
+    for(int init=0; init<dynamicRange; ++init){
+        printf("%d :",   dynamicMap[init*4 + 0]);
+        printf("%d %f/", dynamicMap[init*4 + 1],l[init+start_layer].TIME_CPU);
+        printf("%d %f/", dynamicMap[init*4 + 2],l[init+start_layer].TIME_GPU);
+        printf("%d %f\n",dynamicMap[init*4 + 3],l[init+start_layer].TIME_PPU);
+    }
 
     printf("\n======================================================== \n");
     //tuning option off..
@@ -852,8 +918,8 @@ void print_network(LAYER *l,
         "maxpool  ",    "softmax  ",    "avgpool  ",    "shortcut ",
         "detection",    "classify "
     };
-    char dev_type[3][20] = { 
-        " CPU "," GPU ", " NPU "
+    char dev_type[4][20] = { 
+        " CPU "," GPU ", " NPU ", " PPU "
     };
     printf("layer :      type :     C * (      H *      W) || DEVICE  \n");
     printf("======================================================== \n");
@@ -872,7 +938,7 @@ void inference(LAYER *l,
         
         tic = get_time();
 
-        if(l[i-1].DEVICE == CPU){
+        if(l[i-1].DEVICE == CPU || l[i-1].DEVICE == PPU){
 #ifdef OPENCL
             if(l[i].DEVICE == GPU){
                 mem2cl_obj(l[i-1].OUTPUT, l[i-1].CL_OUTPUT);
@@ -884,7 +950,7 @@ void inference(LAYER *l,
         }
 #ifdef OPENCL        
         else if(l[i-1].DEVICE == GPU){
-            if(l[i].DEVICE == CPU){
+            if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 cl_obj2mem(l[i-1].CL_OUTPUT, &l[i-1].OUTPUT, CL_MAP_WRITE,
                             l[i-1].OUT_C *l[i-1].OUT_H * l[i-1].OUT_W * l[i-1].XF);
             }else if(l[i].DEVICE == NPU){
@@ -893,7 +959,7 @@ void inference(LAYER *l,
         }
 #endif
         else if(l[i-1].DEVICE == NPU){
-            if(l[i].DEVICE == CPU){
+            if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 
             }else if(l[i].DEVICE == GPU){
 
@@ -915,28 +981,7 @@ void inference(LAYER *l,
 
         case CONVOLUTIONAL :
             tic = get_time();
-            if(l[i].IM2COL){
-                im2col(l, i,
-                       l[i-1].OUTPUT, l[i].INPUT,
-                       l[i].IN_C, l[i].IN_H, l[i].IN_W,
-                       l[i].W,
-                       l[i].STRIDE, l[i].PAD);
-                gemm(l, i,
-                     l[i].WEIGHT,    l[i].INPUT,    l[i].OUTPUT,
-                     0, 0,
-                     l[i].N,
-                     l[i].OUT_H * l[i].OUT_W,
-                     l[i].C * l[i].H * l[i].W,
-                     1.0f, 0.0f);
-            }else{
-                gemm(l, i,
-                     l[i].WEIGHT,    l[i-1].OUTPUT,    l[i].OUTPUT,
-                     0, 0,
-                     l[i].N,
-                     l[i].OUT_H * l[i].OUT_W,
-                     l[i].C * l[i].H * l[i].W,
-                     1.0f, 0.0f);
-            }
+            conv(l,i);
             bias_add(l, i,
                      l[i].OUTPUT,l[i].BIAS,
                      l[i].OUT_C, l[i].OUT_H,l[i].OUT_W);
@@ -944,7 +989,17 @@ void inference(LAYER *l,
             activate_function(l, i,
                               l[i].OUTPUT, l[i].ACTIVATION,
                               l[i].OUT_C, l[i].OUT_H,l[i].OUT_W);
-            if(l[i].TUNE) printf(" %.3f",get_time()-tic);
+
+            if(l[i].TUNE){ 
+                tic = get_time() - tic;
+                if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
+                                             l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
+                else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
+                                             l[i].TIME_GPU < tic ? l[i].TIME_GPU : tic; }
+                else if(l[i].DEVICE == PPU){ l[i].TIME_PPU = 
+                                             l[i].TIME_PPU < tic ? l[i].TIME_PPU : tic; }
+                printf(" %.3f",tic);
+            }
 
 //debuging code
 // for(int rr = 0; rr<96; ++rr){
@@ -961,33 +1016,7 @@ void inference(LAYER *l,
 
         case CONVOLUTIONAL_DW :
             tic = get_time();
-            if(l[i].IM2COL){
-                im2col(l, i,
-                       l[i-1].OUTPUT, l[i].INPUT,
-                       l[i].IN_C, l[i].IN_H, l[i].IN_W,
-                       l[i].W,
-                       l[i].STRIDE, l[i].PAD);
-                depth_gemm(l, i,
-                           l[i].WEIGHT, l[i].INPUT, l[i].OUTPUT,
-                           0, 0,
-                           l[i].IN_C,
-                           l[i].OUT_H * l[i].OUT_W,
-                           l[i].H*l[i].W,
-                           l[i].H*l[i].W,   //offset
-                           1.0f, 0.0f);
-            }else{
-                depth_gemm(l, i,
-                           l[i].WEIGHT, l[i-1].OUTPUT, l[i].OUTPUT,
-                           0, 0,
-                           l[i].IN_C,
-                           l[i].OUT_H * l[i].OUT_W,
-                           l[i].H*l[i].W,
-                           l[i].H*l[i].W,   //offset
-                           1.0f, 0.0f);
-                // depthwise_conv(l[i].WEIGHT, l[i].INPUT, l[i].OUTPUT,
-                //            l[i].IN_C, l[i].OUT_H*l[i].OUT_W, l[i].H *l[i].W, 
-                //            l[i].H*l[i].W);
-            }
+            depth_conv(l,i);
             bias_add(l, i,
                      l[i].OUTPUT,l[i].BIAS,
                      l[i].OUT_C, l[i].OUT_H,l[i].OUT_W);
@@ -995,7 +1024,16 @@ void inference(LAYER *l,
             activate_function(l, i,
                               l[i].OUTPUT, l[i].ACTIVATION,
                               l[i].OUT_C, l[i].OUT_H,l[i].OUT_W);
-            if(l[i].TUNE) printf(" %.3f",get_time()-tic);
+            if(l[i].TUNE){ 
+                tic = get_time() - tic;
+                if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
+                                             l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
+                else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
+                                             l[i].TIME_GPU < tic ? l[i].TIME_GPU : tic; }
+                else if(l[i].DEVICE == PPU){ l[i].TIME_PPU = 
+                                             l[i].TIME_PPU < tic ? l[i].TIME_PPU : tic; }
+                printf(" %.3f",tic);
+            }
             break;
 
         case CONNECTED_T :
@@ -1016,7 +1054,16 @@ void inference(LAYER *l,
             activate_function(l, i,
                               l[i].OUTPUT, l[i].ACTIVATION,
                               l[i].OUT_C, l[i].OUT_H,l[i].OUT_W);
-            if(l[i].TUNE) printf(" %.3f",get_time()-tic);
+            if(l[i].TUNE){ 
+                tic = get_time() - tic;
+                if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
+                                             l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
+                else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
+                                             l[i].TIME_GPU < tic ? l[i].TIME_GPU : tic; }
+                else if(l[i].DEVICE == PPU){ l[i].TIME_PPU = 
+                                             l[i].TIME_PPU < tic ? l[i].TIME_PPU : tic; }
+                printf(" %.3f",tic);
+            }
 //debuging code
 // if(i == 11){
 //     for(int rr = 0; rr<256; ++rr){
@@ -1031,7 +1078,16 @@ void inference(LAYER *l,
                     l[i-1].OUTPUT, l[i].OUTPUT, 
                     l[i].IN_C, l[i].IN_H, l[i].IN_W,
                     l[i].W, l[i].STRIDE, l[i].PAD);
-            if(l[i].TUNE) printf(" %.3f",get_time()-tic);
+            if(l[i].TUNE){ 
+                tic = get_time() - tic;
+                if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
+                                             l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
+                else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
+                                             l[i].TIME_GPU < tic ? l[i].TIME_GPU : tic; }
+                else if(l[i].DEVICE == PPU){ l[i].TIME_PPU = 
+                                             l[i].TIME_PPU < tic ? l[i].TIME_PPU : tic; }
+                printf(" %.3f",tic);
+            }
 //debuging code
 // for(int rr = 0; rr<96; ++rr){
 //     printf("%f ",l[i].OUTPUT[rr * l[i].OUT_H * l[i].OUT_W + 0]);
@@ -1047,7 +1103,16 @@ void inference(LAYER *l,
             tic = get_time();
             softmax(l[i-1].OUTPUT, l[i].OUTPUT, 
                     l[i].N);
-            if(l[i].TUNE) printf(" %.3f",get_time()-tic);
+            if(l[i].TUNE){ 
+                tic = get_time() - tic;
+                if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
+                                             l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
+                else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
+                                             l[i].TIME_GPU < tic ? l[i].TIME_GPU : tic; }
+                else if(l[i].DEVICE == PPU){ l[i].TIME_PPU = 
+                                             l[i].TIME_PPU < tic ? l[i].TIME_PPU : tic; }
+                printf(" %.3f",tic);
+            }
 // //debuging code
 // if(i == 12){
 //     for(int rr = 0; rr<256; ++rr){
@@ -1062,7 +1127,16 @@ void inference(LAYER *l,
                     l[i-1].OUTPUT, l[i].OUTPUT,
                     l[i].IN_C, l[i].IN_H, l[i].IN_W,
                     l[i].W, l[i].STRIDE, l[i].PAD);
-            if(l[i].TUNE) printf(" %.3f",get_time()-tic);
+            if(l[i].TUNE){ 
+                tic = get_time() - tic;
+                if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
+                                             l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
+                else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
+                                             l[i].TIME_GPU < tic ? l[i].TIME_GPU : tic; }
+                else if(l[i].DEVICE == PPU){ l[i].TIME_PPU = 
+                                             l[i].TIME_PPU < tic ? l[i].TIME_PPU : tic; }
+                printf(" %.3f",tic);
+            }
             break;
 
         case SHORTCUT :
@@ -1091,7 +1165,7 @@ void inference(LAYER *l,
         }
 
         tic = get_time();
-        if(l[i-1].DEVICE == CPU){
+        if(l[i-1].DEVICE == CPU || l[i-1].DEVICE == PPU){
 #ifdef OPENCL
             if(l[i].DEVICE == GPU){
                 cl_obj2mem(l[i-1].CL_OUTPUT, &l[i-1].OUTPUT, CL_MAP_WRITE,
@@ -1105,7 +1179,7 @@ void inference(LAYER *l,
         }
 #ifdef OPENCL
         else if(l[i-1].DEVICE == GPU){
-            if(l[i].DEVICE == CPU){
+            if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 mem2cl_obj(l[i-1].OUTPUT, l[i-1].CL_OUTPUT);
             }else if(l[i].DEVICE == NPU){
 
@@ -1113,7 +1187,7 @@ void inference(LAYER *l,
         }
 #endif
         else if(l[i-1].DEVICE == NPU){
-            if(l[i].DEVICE == CPU){
+            if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                 
             }else if(l[i].DEVICE == GPU){
 

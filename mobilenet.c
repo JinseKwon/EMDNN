@@ -10,41 +10,41 @@ int main(){
     int i = 0;
     //       LAYER, LAYER_TYPE,    ACTIVATION,  dev, num,   N,   C,H-r,W-s, PAD,STR,SCALE
     //input
-    l=layer_update(l, INPUT_LAYER     , LINEAR, CPU, i++,   0,   3,256,256, 0  ,  0,   5);
+    l=layer_update(l, INPUT_LAYER     , LINEAR, CPU, i++,   0,   3,224,224, 0  ,  0,   5);
     //CONV1
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++,  32,   3,  3,  3, 1  ,  2,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++,  32,   3,  3,  3, 1  ,  2,   4);
     //CONV2
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++,  32,   0,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++,  64,  32,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++,  64,   0,  3,  3, 1  ,  2,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++,  32,   0,  3,  3, 1  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++,  64,  32,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++,  64,   0,  3,  3, 1  ,  2,   4);
     //CONV3
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 128,  64,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++, 128,   0,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 128, 128,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++, 128,   0,  3,  3, 1  ,  2,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++, 128,  64,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++, 128,   0,  3,  3, 1  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++, 128, 128,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++, 128,   0,  3,  3, 1  ,  2,   4);
     //CONV4
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 256, 128,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++, 256,   0,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 256, 256,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++, 256,   0,  3,  3, 1  ,  2,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++, 256, 128,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++, 256,   0,  3,  3, 1  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++, 256, 256,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++, 256,   0,  3,  3, 1  ,  2,   4);
     //CONV5
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 512, 256,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++, 512,   0,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 512, 512,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++, 512,   0,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 512, 512,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++, 512,   0,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 512, 512,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++, 512,   0,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 512, 512,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++, 512,   0,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 512, 512,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++, 512,   0,  3,  3, 1  ,  2,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++, 512, 256,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++, 512,   0,  3,  3, 1  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++, 512, 512,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++, 512,   0,  3,  3, 1  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++, 512, 512,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++, 512,   0,  3,  3, 1  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++, 512, 512,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++, 512,   0,  3,  3, 1  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++, 512, 512,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++, 512,   0,  3,  3, 1  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++, 512, 512,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++, 512,   0,  3,  3, 1  ,  2,   4);
     //CONV6
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++,1024, 512,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , GPU, i++,1024,   0,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++,1024,1024,  1,  1, 0  ,  1,   4);
-    l=layer_update(l, AVGPOOL         , LINEAR, CPU, i++,   0,   0,  8,  8, 0  ,  0,   0);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++,1024, 512,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL_DW, LEAKY , PPU, i++,1024,   0,  3,  3, 1  ,  1,   4);
+    l=layer_update(l, CONVOLUTIONAL   , LEAKY , PPU, i++,1024,1024,  1,  1, 0  ,  1,   4);
+    l=layer_update(l, AVGPOOL         , LINEAR, GPU, i++,   0,   0,  7,  7, 0  ,  0,   0);
     //CONV7
     l=layer_update(l, CONNECTED       , LINEAR, GPU, i++,1000,1024,  1,  1, 0  ,  0,   1);
     l=layer_update(l, SOFTMAX         , LINEAR, CPU, i++,1000,   0,  0,  0, 0  ,  1,   0);
@@ -54,7 +54,7 @@ int main(){
 
     int num_layer = i;
     make_network(l,net_weight,num_layer,f_name);
-    //tune_network(l,num_layer);
+    tune_network(l,num_layer);
 
     print_network(l,num_layer);
     for(int rr =0 ; rr <5; ++rr){

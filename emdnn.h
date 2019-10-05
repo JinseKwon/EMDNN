@@ -8,6 +8,9 @@
 #ifdef OPENCL
 #include <CL/cl.h>
 #endif
+#ifdef NNPACK
+#include <nnpack.h>
+#endif
 
 extern "C"
 
@@ -29,7 +32,7 @@ typedef enum{
     CPU,
     GPU,
     NPU,
-    TUNE
+    PPU
 }DEVICE_TYPE;
 
 //layer print할때 enumerate 열거형 string 형태로 표기하기 위함
@@ -89,6 +92,10 @@ typedef struct LAYER{
 
     //if tuning flag = on/off
     int TUNE;
+    double TIME_CPU;
+    double TIME_GPU;
+    double TIME_PPU;
+    double TIME_NPU;
 
     //DATA
     float* BIAS;
@@ -111,7 +118,9 @@ typedef struct LAYER{
     cl_kernel *KER_BIAS;
     cl_kernel *KER_RELU;
     cl_kernel *KER_AVGPOOL;
-    
+#endif
+#ifdef NNPACK
+    pthreadpool_t PTHREAD;
 #endif
 
 //TODO
@@ -170,6 +179,13 @@ void depth_gemm(LAYER *l, int i,
           int M, int N, int K,
           int offset,
           float ALPHA, float BETA);
+void conv(LAYER *l, int i);
+void depth_conv(LAYER *l, int i);
+#ifdef NNPACK
+void nnpack_depth_conv(LAYER *l, int i);
+void nnpack_conv(LAYER *l, int i);
+void nnpack_fc(LAYER *l, int i);
+#endif
 // void depthwise_conv(float *A, float *B, float *C, 
 //                       int M, int N, int K,
 //                       int offsetA);

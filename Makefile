@@ -1,9 +1,11 @@
 OPENCL=1
 CLBLAST=1
 OPENBLAS=1
+NNPACK=1
 
 CLBLAST_PATH=/home/shunya/CLBlast
 OPENBLAS_PATH=/home/shunya/OpenBLAS
+NNPACK_PATH=/home/shunya/NNPACK-darknet
 
 CC=g++
 CFLAGS= -g -W -Wall -O2
@@ -28,6 +30,13 @@ ifeq ($(OPENBLAS), 1)
 DEF+= -DOPENBLAS
 LIBS+= -fPIC $(OPENBLAS_PATH)/libopenblas.so
 INC+= -I $(OPENBLAS_PATH)
+endif
+
+ifeq ($(NNPACK), 1) 
+DEF+= -DNNPACK
+LIBS+= -fPIC $(NNPACK_PATH)/lib/libnnpack.a
+LIBS+= -fPIC $(NNPACK_PATH)/lib/libpthreadpool.a -lpthread -lm
+INC+= -I $(NNPACK_PATH)/include
 endif
 
 TARGET=skeleton
@@ -60,19 +69,19 @@ $(TARGET5): $(OBJS) $(TAR_OBJS5)
 	# rm *.o
 
 alexnet.o : alexnet.c
-	$(CC) -c -o $@ $^ $(DEF)
+	$(CC) -c -o $@ $^ $(DEF) $(INC)
 
 skeleton.o : skeleton.c
-	$(CC) -c -o $@ $^ $(DEF)
+	$(CC) -c -o $@ $^ $(DEF) $(INC)
 
 tinydark.o : tinydark.c
-	$(CC) -c -o $@ $^ $(DEF)
+	$(CC) -c -o $@ $^ $(DEF) $(INC)
 
 vgg16.o : vgg16.c
-	$(CC) -c -o $@ $^ $(DEF)
+	$(CC) -c -o $@ $^ $(DEF) $(INC)
 
 mobilenet.o : mobilenet.c
-	$(CC) -c -o $@ $^ $(DEF)
+	$(CC) -c -o $@ $^ $(DEF) $(INC)
 
 emdnn.o : emdnn.c
 	$(CC) -c -o emdnn.o emdnn.c $(DEF)  $(INC)
@@ -81,13 +90,13 @@ blas.o : blas.c
 	$(CC) -c -o blas.o blas.c $(DEF) $(INC)
 
 detection_layer.o : detection_layer.c 
-	$(CC) -c -o detection_layer.o detection_layer.c $(DEF)
+	$(CC) -c -o detection_layer.o detection_layer.c $(DEF) $(INC)
 
 classification_layer.o : classification_layer.c 
-	$(CC) -c -o classification_layer.o classification_layer.c $(DEF)
+	$(CC) -c -o classification_layer.o classification_layer.c $(DEF) $(INC)
 
 image_io.o : image_io.c 
-	$(CC) -c -o image_io.o image_io.c `pkg-config --cflags --libs opencv` $(DEF)
+	$(CC) -c -o image_io.o image_io.c `pkg-config --cflags --libs opencv` $(DEF) $(INC)
 
 clean :
 	rm *.o $(TARGET) $(TARGET2) $(TARGET3) $(TARGET4) $(TARGET5)

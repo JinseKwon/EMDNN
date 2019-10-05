@@ -9,6 +9,7 @@
 #include <cblas.h>
 #endif
 
+
 float* input_bin_img(float* input, int C, int H, int W){
     FILE *fin = fopen("dog.bin", "rb");
     if (!fin) {
@@ -104,6 +105,16 @@ void cpu_depthwise_conv(float *A, float *B, float *C,
     }
     // printf(" > str_gemm ");
 }
+void depth_conv(LAYER *l, int i){
+    depth_gemm(l, i,
+            l[i].WEIGHT, l[i].INPUT, l[i].OUTPUT,
+            0, 0,
+            l[i].IN_C,
+            l[i].OUT_H * l[i].OUT_W,
+            l[i].H*l[i].W,
+            l[i].H*l[i].W,   //offset
+            1.0f, 0.0f);
+}
 void depth_gemm(LAYER *l, int i,
           float* A,    float* B,    float* C,
           int ta, int tb,
@@ -117,6 +128,11 @@ void depth_gemm(LAYER *l, int i,
         cl_mem cl_C = l[i].CL_OUTPUT;
         if(l[i].IM2COL){
             cl_B = l[i].CL_INPUT;
+            im2col(l, i,
+                   l[i-1].OUTPUT, l[i].INPUT,
+                   l[i].IN_C, l[i].IN_H, l[i].IN_W,
+                   l[i].W,
+                   l[i].STRIDE, l[i].PAD);
         }else{
             cl_B = l[i-1].CL_OUTPUT;
         }
@@ -137,6 +153,16 @@ void depth_gemm(LAYER *l, int i,
         }
 #endif
     }else if(l[i].DEVICE == CPU){
+        if(l[i].IM2COL){
+            im2col(l, i,
+                l[i-1].OUTPUT, l[i].INPUT,
+                l[i].IN_C, l[i].IN_H, l[i].IN_W,
+                l[i].W,
+                l[i].STRIDE, l[i].PAD);
+            B = l[i].INPUT;
+        }else{
+            B = l[i-1].OUTPUT;
+        }
 #ifdef OPENBLAS
         for(int itr=0;itr<M; ++itr){
             cblas_sgemm(CblasRowMajor,
@@ -154,27 +180,107 @@ void depth_gemm(LAYER *l, int i,
                         OFFSET);
 #endif
     }
+    else if(l[i].DEVICE == PPU){
+#ifdef NNPACK
+        nnpack_depth_conv(l, i);
+#endif
+    }
     if(!l[i].TUNE)    printf(" > depth_c ");
 }
 
+#ifdef NNPACK
+void nnpack_depth_conv(LAYER *l, int i){
+    struct nnp_padding NP_in_pad   = { l[i].PAD   , l[i].PAD , 
+                                       l[i].PAD   , l[i].PAD    };  
+    struct nnp_size    NP_in_size  = { l[i].IN_H  , l[i].IN_W   };  
+    struct nnp_size    NP_ker_size = { l[i].H     , l[i].W      };
+    struct nnp_size    NP_str_size = { l[i].STRIDE, l[i].STRIDE };
+    for(int ch = 0; ch< l[i].N; ++ch){
+        nnp_convolution_inference(
+            nnp_convolution_algorithm_implicit_gemm,
+            nnp_convolution_transform_strategy_tuple_based,
+            1,
+            1,
+            NP_in_size,
+            NP_in_pad,
+            NP_ker_size,
+            NP_str_size,
+            l[i-1].OUTPUT + (l[i].IN_H * l[i].IN_W * ch),
+            l[i].WEIGHT   + (l[i].H    * l[i].W    * ch),
+            NULL,
+            l[i].OUTPUT   + (l[i].OUT_H* l[i].OUT_W* ch),
+            l[0].PTHREAD,
+            NULL
+        );
+    }
+    if(!l[i].TUNE)    printf(" > CONV ");
+}
+void nnpack_conv(LAYER *l, int i){
+    struct nnp_padding NP_in_pad   = { l[i].PAD   , l[i].PAD , 
+                                       l[i].PAD   , l[i].PAD    };  
+    struct nnp_size    NP_in_size  = { l[i].IN_H  , l[i].IN_W   };  
+    struct nnp_size    NP_ker_size = { l[i].H     , l[i].W      };
+    struct nnp_size    NP_str_size = { l[i].STRIDE, l[i].STRIDE };
+    nnp_convolution_inference(
+        nnp_convolution_algorithm_implicit_gemm,
+        nnp_convolution_transform_strategy_tuple_based,
+        l[i].IN_C,
+        l[i].N,
+        NP_in_size,
+        NP_in_pad,
+        NP_ker_size,
+        NP_str_size,
+        l[i-1].OUTPUT,
+        l[i].WEIGHT,
+        NULL,
+        l[i].OUTPUT,
+        l[0].PTHREAD,
+        NULL
+    );
+    if(!l[i].TUNE)    printf(" > CONV ");
+}
+void nnpack_fc(LAYER *l, int i){
+    nnp_fully_connected_inference(
+        l[i].C,
+        l[i].N,
+        l[i-1].OUTPUT,
+        l[i].WEIGHT,
+        l[i].OUTPUT,
+        l[0].PTHREAD
+    );
+    if(!l[i].TUNE)    printf(" > FC ");
+}
+#endif
+void conv(LAYER *l, int i){
+    gemm(l, i,
+         l[i].WEIGHT,    l[i].INPUT,    l[i].OUTPUT,
+         0, 0,
+         l[i].N,
+         l[i].OUT_H * l[i].OUT_W,
+         l[i].C * l[i].H * l[i].W,
+         1.0f, 0.0f);
+}
 void gemm(LAYER *l, int i,
           float* A,    float* B,    float* C,
           int ta, int tb,
           int M, int N, int K,
           float ALPHA, float BETA){
+
     if(l[i].DEVICE == GPU){
 #ifdef CLBLAST
         cl_mem cl_A = l[i].CL_WEIGHT; 
         cl_mem cl_B;
         cl_mem cl_C = l[i].CL_OUTPUT;
         if(l[i].IM2COL){
+            im2col(l, i,
+                   l[i-1].OUTPUT, l[i].INPUT,
+                   l[i].IN_C, l[i].IN_H, l[i].IN_W,
+                   l[i].W,
+                   l[i].STRIDE, l[i].PAD);
             cl_B = l[i].CL_INPUT;
         }else{
             cl_B = l[i-1].CL_OUTPUT;
         }
-        // mem2cl_obj(A, cl_A);
-        // mem2cl_obj(B, cl_B);
-        // mem2cl_obj(C, cl_C);
         CLBlastStatusCode status;
         status = CLBlastSgemm(CLBlastLayoutRowMajor,
                         CLBlastTransposeNo, CLBlastTransposeNo,
@@ -188,23 +294,34 @@ void gemm(LAYER *l, int i,
         if (status == CLBlastSuccess) {
         clWaitForEvents(1, l[0].EVT);
         }
-        // cl_obj2mem(cl_A, &A,CL_MAP_WRITE, M*K*l[i].XF);
-        // cl_obj2mem(cl_B, &B,CL_MAP_WRITE, K*N*l[i].XF);
-        // cl_obj2mem(cl_C, &C,CL_MAP_WRITE, M*N*l[i].XF);
 #endif
     }else if(l[i].DEVICE == CPU){
+        if(l[i].IM2COL){
+            im2col(l, i,
+                l[i-1].OUTPUT, l[i].INPUT,
+                l[i].IN_C, l[i].IN_H, l[i].IN_W,
+                l[i].W,
+                l[i].STRIDE, l[i].PAD);
+            B = l[i].INPUT;
+        }else{
+            B = l[i-1].OUTPUT;
+        }
 #ifdef OPENBLAS
-    cblas_sgemm(CblasRowMajor,
-                CblasNoTrans, CblasNoTrans,
-                M, N, K,
-                1.0f,
-                A, K,
-                B, N,
-                0.0f,
-                C, N);
+        cblas_sgemm(CblasRowMajor,
+                    CblasNoTrans, CblasNoTrans,
+                    M, N, K,
+                    1.0f,
+                    A, K,
+                    B, N,
+                    0.0f,
+                    C, N);
 #else
-    cpu_gemm(A, B, C,
-             M, N, K);
+        cpu_gemm(A, B, C,
+                M, N, K);
+#endif
+    }else if(l[i].DEVICE == PPU){
+#ifdef NNPACK
+        nnpack_conv(l, i);
 #endif
     }
     if(!l[i].TUNE)    printf(" > gemm ");
@@ -247,6 +364,10 @@ void gemv(LAYER *l, int i,
 #else
     cpu_gemv(A,B,C,
              M,N,K);
+#endif
+    }else if(l[i].DEVICE == PPU){
+#ifdef NNPACK
+        nnpack_fc(l, i);
 #endif
     }
     if(!l[i].TUNE)    printf(" > gemv ");
@@ -347,7 +468,7 @@ void maxpool(LAYER *l,  int i,
     
     //pad 값 있는경우 추가 작성해야함..
     
-    if(l[i].DEVICE == CPU){
+    if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
         //NC HW RS
         for(int c = 0; c < C; c++){
             for(int h = center; h < H; h=h+stride){
@@ -402,7 +523,7 @@ void avgpool(LAYER *l,  int i,
              int KER, int stride, int PAD){
 
     float mean_n = KER*KER;
-    if(l[i].DEVICE == CPU){
+    if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
 
         for(int c = 0; c < C; c++){
             float avgp = 0.0f;
@@ -481,7 +602,7 @@ void batch_normalizaiton(float *bias, float *weight,
 void bias_add(LAYER *l, int i,
               float* in, float* bias, 
               int C, int H, int W){
-    if(l[i].DEVICE == CPU){
+    if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
         for(int c = 0; c<C; ++c){
             for(int hw = 0; hw < H*W; ++hw){
                 in[c*H*W + hw] += bias[c];
@@ -514,7 +635,7 @@ void activate_function(LAYER *l, int i,
                        int C, int H, int W){
     switch(act){
     case RELU:
-        if(l[i].DEVICE == CPU){
+        if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
             for (int chw = 0; chw < C*H*W; ++chw) {
                 in[chw] = (in[chw]>0) ? in[chw] : 0;
             }
@@ -534,7 +655,7 @@ void activate_function(LAYER *l, int i,
 #endif
         break;
     case LEAKY:
-        if(l[i].DEVICE == CPU){
+        if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
             for (int chw = 0; chw < C*H*W; ++chw) {
                 in[chw] = (in[chw]>0) ? in[chw] : .1*in[chw];
             }
