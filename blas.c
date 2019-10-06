@@ -2,6 +2,12 @@
 #include <math.h>
 #include <float.h>
 
+#ifdef DEBUG_PRINT
+#define DEBUG_PRINT 1
+#else 
+#define DEBUG_PRINT 0
+#endif
+
 #ifdef CLBLAST
 #include <clblast_c.h>
 #endif
@@ -185,7 +191,7 @@ void depth_gemm(LAYER *l, int i,
         nnpack_depth_conv(l, i);
 #endif
     }
-    if(!l[i].TUNE)    printf(" > depth_c ");
+    if(!l[i].TUNE && DEBUG_PRINT)    printf(" > depth_c ");
 }
 
 #ifdef NNPACK
@@ -213,7 +219,7 @@ void nnpack_depth_conv(LAYER *l, int i){
             NULL
         );
     }
-    if(!l[i].TUNE)    printf(" > CONV ");
+    if(!l[i].TUNE && DEBUG_PRINT)    printf(" > CONV ");
 }
 void nnpack_conv(LAYER *l, int i){
     struct nnp_padding NP_in_pad   = { l[i].PAD   , l[i].PAD , 
@@ -237,7 +243,7 @@ void nnpack_conv(LAYER *l, int i){
         l[0].PTHREAD,
         NULL
     );
-    if(!l[i].TUNE)    printf(" > CONV ");
+    if(!l[i].TUNE && DEBUG_PRINT)    printf(" > CONV ");
 }
 void nnpack_fc(LAYER *l, int i){
     nnp_fully_connected_inference(
@@ -248,7 +254,7 @@ void nnpack_fc(LAYER *l, int i){
         l[i].OUTPUT,
         l[0].PTHREAD
     );
-    if(!l[i].TUNE)    printf(" > FC ");
+    if(!l[i].TUNE && DEBUG_PRINT)    printf(" > FC ");
 }
 #endif
 void conv(LAYER *l, int i){
@@ -324,7 +330,7 @@ void gemm(LAYER *l, int i,
         nnpack_conv(l, i);
 #endif
     }
-    if(!l[i].TUNE)    printf(" > gemm ");
+    if(!l[i].TUNE && DEBUG_PRINT)    printf(" > gemm ");
 }
 
 void gemv(LAYER *l, int i,
@@ -370,7 +376,7 @@ void gemv(LAYER *l, int i,
         nnpack_fc(l, i);
 #endif
     }
-    if(!l[i].TUNE)    printf(" > gemv ");
+    if(!l[i].TUNE && DEBUG_PRINT)    printf(" > gemv ");
 }
 
 //im2col은 >> CONV 시   weight * input으로 처리하도록 수정해야함.
@@ -456,7 +462,7 @@ void im2col(LAYER *l, int i,
         clFinish(*l[0].QUE);
     }
 #endif
-    if(!l[i].TUNE)    printf(" > im2col ");
+    if(!l[i].TUNE && DEBUG_PRINT)    printf(" > im2col ");
 }
 
 void maxpool(LAYER *l,  int i,
@@ -628,7 +634,7 @@ void bias_add(LAYER *l, int i,
     }
 #endif
     
-    if(!l[i].TUNE)   printf(" > bias ");
+    if(!l[i].TUNE && DEBUG_PRINT)   printf(" > bias ");
 }
 void activate_function(LAYER *l, int i,
                        float* in, ACTIVATION_TYPE act, 
@@ -679,7 +685,7 @@ void activate_function(LAYER *l, int i,
     default:
         return;
     }
-    if(!l[i].TUNE)    printf(" > activation ");
+    if(!l[i].TUNE && DEBUG_PRINT)    printf(" > activation ");
 }
 struct timespec u_time;
 double get_time(){

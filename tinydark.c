@@ -40,7 +40,7 @@ int main(){
 
     int num_layer = i;
     make_network(l,net_weight,num_layer,f_name);
-    tune_network(l,num_layer);
+    // tune_network(l,num_layer);
 
     print_network(l,num_layer);
     for(int rr =0 ; rr <10; ++rr){

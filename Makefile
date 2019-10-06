@@ -3,9 +3,13 @@ CLBLAST=1
 OPENBLAS=1
 NNPACK=1
 
+DEBUG_PRINT=0
+
 CLBLAST_PATH=/home/shunya/CLBlast
 OPENBLAS_PATH=/home/shunya/OpenBLAS
 NNPACK_PATH=/home/shunya/NNPACK-darknet
+
+
 
 CC=g++
 CFLAGS= -g -W -Wall -O2
@@ -14,6 +18,10 @@ SRCS=$(patsubst %.o, %.c, $(OBJS))
 LIBS=-lm `pkg-config --libs opencv`
 DEF=
 INC=
+
+ifeq ($(DEBUG_PRINT), 1) 
+DEF+= -DDEBUG_PRINT
+endif
 
 ifeq ($(OPENCL), 1) 
 LIBS+= -lOpenCL

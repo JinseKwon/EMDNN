@@ -169,7 +169,8 @@ IplImage* image_read(char *img_file, float *image, int img_size,
 //     // cvReleaseImage(&input_img);
 //     //printf("hihih");
 // }
-void image_show(float* box_output, IplImage *readimg){
+void image_show(float* box_output, IplImage *readimg,
+                double elapsed){
     char text[20];
     CvFont font, font_guide, font_txt;
 
@@ -178,7 +179,7 @@ void image_show(float* box_output, IplImage *readimg){
     cvInitFont(&font_txt, CV_FONT_HERSHEY_SIMPLEX, 0.6, 0.6, 0 ,2);//, 0, 1, CV_AA);
 
     // double elapsed = timer_stop(0);
-    double elapsed = 1;
+    // double elapsed = 1;
 
     // printf("printing box... %d <<< \n",(int)box_output[13*13*5*20*6]);
     if((int)box_output[13*13*5*20*6] > 0){
@@ -204,7 +205,7 @@ void image_show(float* box_output, IplImage *readimg){
     cvPutText(readimg, text, cvPoint(200, 50), &font_guide, CV_RGB(255, 29, 29));    //latency val
 
     cvShowImage("YOLO tiny with OpenCL",readimg);
-    cvWaitKey(33);
+    cvWaitKey(500);
 
     //if(cvWaitKey(33) == 1048691){   "s" key input
 }

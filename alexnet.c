@@ -19,11 +19,11 @@ int main(){
     l=layer_update(l, CONVOLUTIONAL   , RELU  , GPU, i++, 384, 256,  3,  3, 1  ,  1,   1);
     l=layer_update(l, CONVOLUTIONAL   , RELU  , GPU, i++, 384, 384,  3,  3, 1  ,  1,   1);
     l=layer_update(l, CONVOLUTIONAL   , RELU  , GPU, i++, 256, 384,  3,  3, 1  ,  1,   1);
-    l=layer_update(l, MAXPOOL         , LINEAR, PPU, i++,   0,   0,  3,  3, 0  ,  2,   0);
+    l=layer_update(l, MAXPOOL         , LINEAR, GPU, i++,   0,   0,  3,  3, 0  ,  2,   0);
     //FC
-    l=layer_update(l, CONNECTED       , RELU  , PPU, i++,4096,9216,  1,  1, 0  ,  0,   1);
-    l=layer_update(l, CONNECTED       , RELU  , PPU, i++,4096,4096,  1,  1, 0  ,  0,   1);
-    l=layer_update(l, CONNECTED       , LINEAR, PPU, i++,1000,4096,  1,  1, 0  ,  0,   1);
+    l=layer_update(l, CONNECTED       , RELU  , CPU, i++,4096,9216,  1,  1, 0  ,  0,   1);
+    l=layer_update(l, CONNECTED       , RELU  , CPU, i++,4096,4096,  1,  1, 0  ,  0,   1);
+    l=layer_update(l, CONNECTED       , LINEAR, CPU, i++,1000,4096,  1,  1, 0  ,  0,   1);
     l=layer_update(l, SOFTMAX         , LINEAR, CPU, i++,1000,   0,  0,  0, 0  ,  1,   0);
     
     //       LAYER, LAYER_TYPE,  ACTIVATION, num,Nclass,Box 
@@ -31,7 +31,7 @@ int main(){
 
     int num_layer = i;
     make_network(l,net_weight,num_layer,f_name);
-    tune_network(l,num_layer);
+    //tune_network(l,num_layer);
 
     print_network(l,num_layer);
     for(int rr =0 ; rr <4; ++rr){

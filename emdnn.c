@@ -5,6 +5,12 @@
 // #define OPENCL
 // #define FILE_CHECK
 
+#ifdef DEBUG_PRINT
+#define DEBUG_PRINT 1
+#else 
+#define DEBUG_PRINT 0
+#endif
+
 #ifdef OPENCL
 #include "opencl_init.h"
 
@@ -934,7 +940,7 @@ void inference(LAYER *l,
     // for(int i = 0; i<3; ++i){            
     double tic;
     for(int i = 0; i<num; ++i){    
-        if(!l[i].TUNE)   printf("now layer >> %d ", i);
+        if(!l[i].TUNE && DEBUG_PRINT)   printf("now layer >> %d ", i);
         
         tic = get_time();
 
@@ -1211,7 +1217,7 @@ void inference(LAYER *l,
 //     // printf("\n detection boxes : %d ",(int)l[i].OUTPUT[13*13*5*20*6]);
 // // }
 // }
-        if(!l[i].TUNE)   printf("\n");
+        if(!l[i].TUNE && DEBUG_PRINT)   printf("\n");
         // printf(" | complete \n");
         // printf("file access : %d / %d \n", file_access*4, 17015472);
     }

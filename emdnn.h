@@ -228,7 +228,8 @@ IplImage* image_read(char *img_file, float *image, int img_size,
 
 // void imagefile_read( float *image, int img_size, char *filename);
 // void imagefile_read2( float *image, int img_size,int n);
-void image_show(float* box_output, IplImage *readimg);
+void image_show(float* box_output, IplImage *readimg,
+                double elapsed);
 void image_free();
 
 #ifdef OPENCL
