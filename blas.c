@@ -147,10 +147,10 @@ void depth_gemm(LAYER *l, int i,
                         CLBlastLayoutRowMajor,
                         CLBlastTransposeNo, CLBlastTransposeNo,
                         1, N, K,
-                        1.0f,
+                        ALPHA,
                         cl_A, 0, K, K,
                         cl_B, 0, N, K*N,
-                        0.0f,
+                        BETA,
                         cl_C, 0, N, N,
                         M,
                         l[0].QUE, l[0].EVT);
@@ -171,14 +171,23 @@ void depth_gemm(LAYER *l, int i,
         }
 #ifdef OPENBLAS
         for(int itr=0;itr<M; ++itr){
-            cblas_sgemm(CblasRowMajor,
-                        CblasNoTrans, CblasNoTrans,
-                        1, N, K,
-                        1.0f,
-                        A+(itr*K), K,
-                        B+(itr*K*N), N,
-                        0.0f,
-                        C+(itr*N), N);
+            cblas_sgemv(CblasRowMajor,
+                        CblasNoTrans,
+                        N, K,
+                        ALPHA,
+                        B+(itr*K*N), K,
+                        A+(itr*K), 1,
+                        BETA,
+                        C+(itr*N), 1);
+
+            // cblas_sgemm(CblasRowMajor,
+            //             CblasNoTrans, CblasNoTrans,
+            //             1, N, K,
+            //             1.0f,
+            //             A+(itr*K), K,
+            //             B+(itr*K*N), N,
+            //             0.0f,
+            //             C+(itr*N), N);
         }
 #else
         cpu_depthwise_conv(A, B, C,
@@ -255,6 +264,24 @@ void nnpack_fc(LAYER *l, int i){
         l[0].PTHREAD
     );
     if(!l[i].TUNE && DEBUG_PRINT)    printf(" > FC ");
+}
+void nnpack_maxpool(LAYER *l, int i){
+    struct nnp_padding NP_in_pad   = { 0          , l[i].PAD , 
+                                       l[i].PAD   , 0           };  
+    struct nnp_size    NP_in_size  = { l[i].IN_H  , l[i].IN_W   };  
+    struct nnp_size    NP_pool_size ={ l[i].H     , l[i].W      };
+    struct nnp_size    NP_str_size = { l[i].STRIDE, l[i].STRIDE };
+
+    nnp_max_pooling_output(
+        1,
+        l[i].IN_C,
+        NP_in_size,
+        NP_in_pad,
+        NP_pool_size,
+        NP_str_size,
+        l[i-1].OUTPUT,
+        l[i].OUTPUT,
+        l[0].PTHREAD);
 }
 #endif
 void conv(LAYER *l, int i){
@@ -474,7 +501,7 @@ void maxpool(LAYER *l,  int i,
     
     //pad 값 있는경우 추가 작성해야함..
     
-    if(l[i].DEVICE == CPU || l[i].DEVICE == PPU){
+    if(l[i].DEVICE == CPU){
         //NC HW RS
         for(int c = 0; c < C; c++){
             for(int h = center; h < H; h=h+stride){
@@ -521,6 +548,11 @@ void maxpool(LAYER *l,  int i,
         clFinish(*l[0].QUE);
     }
 #endif
+    else if(l[i].DEVICE == PPU){
+#ifdef NNPACK
+        nnpack_maxpool(l, i);
+#endif
+    }
 }
 
 void avgpool(LAYER *l,  int i,

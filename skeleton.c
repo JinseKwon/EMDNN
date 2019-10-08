@@ -19,11 +19,11 @@ int main(){
     l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++,  64,  32,  3,  3, 1  ,  1,   4);
     l=layer_update(l, MAXPOOL         , LINEAR, GPU, i++,   0,   0,  2,  2, 0  ,  2,   0);
     l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 128,  64,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, MAXPOOL         , LINEAR, GPU, i++,   0,   0,  2,  2, 0  ,  2,   0);
+    l=layer_update(l, MAXPOOL         , LINEAR, PPU, i++,   0,   0,  2,  2, 0  ,  2,   0);
     l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 256, 128,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, MAXPOOL         , LINEAR, GPU, i++,   0,   0,  2,  2, 0  ,  2,   0);
+    l=layer_update(l, MAXPOOL         , LINEAR, PPU, i++,   0,   0,  2,  2, 0  ,  2,   0);
     l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++, 512, 256,  3,  3, 1  ,  1,   4);
-    l=layer_update(l, MAXPOOL         , LINEAR, GPU, i++,   0,   0,  2,  2, 0  ,  1,   0);
+    l=layer_update(l, MAXPOOL         , LINEAR, PPU, i++,   0,   0,  2,  2, 1  ,  1,   0);
     l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++,1024, 512,  3,  3, 1  ,  1,   4);
     l=layer_update(l, CONVOLUTIONAL   , LEAKY , GPU, i++,1024,1024,  3,  3, 1  ,  1,   4);
     l=layer_update(l, CONVOLUTIONAL   , LINEAR, GPU, i++, 125,1024,  1,  1, 0  ,  1,   1);
@@ -32,7 +32,7 @@ int main(){
     int num_layer = i;
 
     make_network(l,net_weight,num_layer,f_name);
-    // tune_network(l,num_layer);
+    tune_network(l,num_layer);
 
     print_network(l,num_layer);
     

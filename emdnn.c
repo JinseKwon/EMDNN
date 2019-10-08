@@ -830,19 +830,19 @@ void tune_network(LAYER *l,
     }
 
     //tuning iteration stage
-    for(int k=0; k < iter+1; ++k){
-        
-        int bit_vec = k;
-        //tuning result setting
-        if(k == iter){
-            bit_vec = min_para;
-        }
+    for(int dbk=0; dbk < iter+1; ++dbk){
+        int k = dbk / 2;
+        // int bit_vec = k;
+        // //tuning result setting
+        // if(k == iter){
+        //     bit_vec = min_para;
+        // }
         //input_layer
-        printf("%d %c", k,dev_type[l[0].DEVICE][1]);
+        printf("%d %c", dbk,dev_type[l[0].DEVICE][1]);
         
         //device tuning
         for(int rnd = start_layer; rnd < end_layer + 1; ++rnd){
-            if(dynamicMap[(rnd-start_layer) * 4 + 0] >= 50){
+            if(dynamicMap[(rnd-start_layer) * 4 + 0] >= 40){
                 //TODO:tuning stage reset...
                 
                 double min = l[rnd].TIME_CPU;
@@ -858,7 +858,7 @@ void tune_network(LAYER *l,
                 }
                 l[rnd].DEVICE = SEL_DEV[sel];
             }
-            else if(dynamicMap[(rnd-start_layer) * 4 + 0] <= 30){
+            else if(dynamicMap[(rnd-start_layer) * 4 + 0] >= 10){
                 l[rnd].DEVICE = SEL_DEV[ (rnd+k) % 3 ];
                 dynamicMap[(rnd-start_layer)*4 + ((rnd+k) % 3)+1] += 1;
                 dynamicMap[(rnd-start_layer)*4 + 0         ] += 1;
