@@ -8,10 +8,13 @@ const char class_name[20][20] = {"aeroplane", "bicycle", "bird", "boat", "bottle
                                 "bus", "car", "cat", "chair", "cow", 
                                 "diningtable", "dog", "horse", "motorbike", "person", 
                                 "pottedplant", "sheep", "sofa", "train", "tvmonitor"};
-const char color_map[20][3] ={  {204,23,134},{153,63,118},{171,4,255},{255,251,141},{204,179,23},
-                            {155,204,39},{250,255,0},{255,65,0},{137,255,196},{20,204,60},
-                            {204,172,23},{0,255,134},{187,204,180},{66,214,255},{255,228,23},
-                            {204,150,192},{153,63,134},{148,4,255},{255,242,66},{204,173,23}};
+const char color_map[20][3] ={
+  {(char)204,(char)23,(char)134},{(char)153,(char)63,(char)118},{(char)171,(char)4,(char)255},{(char)255,(char)251,(char)141},{(char)204,(char)179,(char)23},
+  {(char)155,(char)204,(char)39},{(char)250,(char)255,(char)0},{(char)255,(char)65,(char)0},{(char)137,(char)255,(char)196},{(char)20,(char)204,(char)60},
+  {(char)204,(char)172,(char)23},{(char)0,(char)255,(char)134},{(char)187,(char)204,(char)180},{(char)66,(char)214,(char)255},{(char)255,(char)228,(char)23},
+  {(char)204,(char)150,(char)192},{(char)153,(char)63,(char)134},{(char)148,(char)4,(char)255},{(char)255,(char)242,(char)66},{(char)204,(char)173,(char)23}
+};
+
 float scale;
 // CvCapture* capture = cvCaptureFromCAM(0);
 // void cam_read(float *image, int img_size){

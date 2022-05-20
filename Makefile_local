@@ -5,9 +5,9 @@ NNPACK=1
 
 DEBUG_PRINT=0
 
-CLBLAST_PATH=/content/CLBlast
-OPENBLAS_PATH=/usr/lib/x86_64-linux-gnu
-NNPACK_PATH=/content/NNPACK
+CLBLAST_PATH=/home/shunya/CLBlast
+OPENBLAS_PATH=/home/shunya/OpenBLAS
+NNPACK_PATH=/home/shunya/NNPACK-darknet
 
 CC=g++
 CFLAGS= -g -W -Wall -O2
@@ -28,24 +28,21 @@ endif
 
 ifeq ($(CLBLAST), 1) 
 DEF+= -DCLBLAST -DOPENCL
-LIBS+= -lOpenCL -fPIC $(CLBLAST_PATH)/build/libclblast.so.1
+LIBS+= -lOpenCL -fPIC $(CLBLAST_PATH)/build/libclblast.so
 INC+= -I $(CLBLAST_PATH)/include
 endif
 
 ifeq ($(OPENBLAS), 1) 
 DEF+= -DOPENBLAS
-LIBS+= -lopenblas
-INC+=
+LIBS+= -fPIC $(OPENBLAS_PATH)/libopenblas.so
+INC+= -I $(OPENBLAS_PATH)
 endif
 
 ifeq ($(NNPACK), 1) 
 DEF+= -DNNPACK
-LIBS+= -fPIC $(NNPACK_PATH)/build/libnnpack.a
-LIBS+= -fPIC $(NNPACK_PATH)/build/deps/pthreadpool/libpthreadpool.a -lpthread -lm
-LIBS+= -fPIC $(NNPACK_PATH)/build/deps/cpuinfo/libcpuinfo.a
-LIBS+= -fPIC $(NNPACK_PATH)/build/deps/cpuinfo/deps/clog/libclog.a
-INC+= -I $(NNPACK_PATH)/include -I $(NNPACK_PATH)/deps/pthreadpool/include -I $(NNPACK_PATH)/deps/cpuinfo/include -I $(NNPACK_PATH)/deps/cpuinfo/deps/clog/include
-
+LIBS+= -fPIC $(NNPACK_PATH)/lib/libnnpack.a
+LIBS+= -fPIC $(NNPACK_PATH)/lib/libpthreadpool.a -lpthread -lm
+INC+= -I $(NNPACK_PATH)/include
 endif
 
 TARGET=yolotiny
