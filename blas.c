@@ -1,6 +1,8 @@
 #include "emdnn.h"
 #include <math.h>
+#include <limits.h>
 #include <float.h>
+#include <arm_neon.h>
 
 #ifdef DEBUG_PRINT
 #define DEBUG_PRINT 1
@@ -60,29 +62,113 @@ void transpose_fc(float *INA,
     }
     free(temp);
 }
-//merged donghee's code
-void cpu_gemv(float *A, float *B, float *C, 
-               int M, int N, int K){  //N=1
-    for (int m = 0; m < M; ++m) {
-        float sum = 0;
-        for (int k = 0; k < K; ++k) {
-            sum += A[m * K + k] * B[k];
+
+float maximum(float *A,int N){
+    float max=-FLT_MAX;
+    for(long i = 0; i < N; ++i){
+        if(fabs(A[i])>max){
+            max = fabs(A[i]);
         }
-        C[m] = sum;
     }
-    //printf(" > gemv ");
+    return max;
+}
+void T_fp32_int8(float *A, int8_t *A_q8, 
+               int N, int K, float range){
+    
+    float scale = 127/range;
+    for(int i = 0; i < N; ++i){
+        for(int k = 0; k < K; ++k){
+            A_q8[i*K+k] = (int8_t)(A[k*N+i]*scale);
+        }
+    }
+}
+void fp32_int8(float *A, int8_t *A_q8, 
+               long N,    float range){
+    
+    float scale = 127/range;
+    for(long i = 0; i < N; ++i){
+        A_q8[i] = (int8_t)(A[i]*scale);
+    }
+}
+void int32_fp32(int *C_q, float *C,
+               long N,    float range1, float range2){
+    
+    float scale1 = 127/range1;
+    float scale2 = 127/range2;
+    scale1 = scale1 * scale2;
+    for(long i = 0; i < N; ++i){
+        C[i] = (float)(C_q[i]/scale1);
+    }
+}
+void AddDot8(int M, int N, int K, int i, int j, int8_t *A, int8_t *B, int *C){
+    register int sum = 0;
+    for(int k=0; k<K; k+=8){
+        if(k+8 < K){
+            int8x8_t a = vld1_s8(A + i*K + k);
+            int8x8_t b = vld1_s8(B + j*K + k);
+            int16x8_t c = {0,0,0,0, 0,0,0,0};
+            c = vmlal_s8(c,a,b);
+            int16_t t[8];
+            vst1q_s16 (t, c);
+            sum += (int)(t[0] + t[1] + t[2] + t[3] + t[4] + t[5] + t[6] + t[7]); 
+        }else{
+            // printf("k = %d K = %d \n", k, K);
+            for(int kk = k; kk<K; kk++){
+                sum += (int)(A[i * K + k] * B[j * K + k]);
+            }
+        }
+    }
+    C[i*N+j] = sum;
+}
+void AddDot8_gemm(int8_t *A_q8, int8_t *B_q8, int *C_q,int M, int N, int K){
+    for (int i = 0; i < M; i++) {
+        for (int j = 0; j < N; j++) {
+            AddDot8(M,N,K,i,j,A_q8,B_q8,C_q);
+        }
+    }
+}
+void T_gemm_qu_de_q8(float *A, float *B, float *C,int M, int N, int K){
+    int8_t *A_q8 = (int8_t*)malloc(M * K * sizeof(int8_t));
+    int8_t *B_q8 = (int8_t*)malloc(K * N * sizeof(int8_t));
+    int    *C_q  = (int*)   malloc(M * N * sizeof(int));
+
+    /* 1. Scale Quantization */
+        //1 = positive max interger range
+    float rng1 = maximum(A,M*K);
+    float rng2 = maximum(B,K*N);
+    // printf("%.6f %.6f\n",rng1, rng2); 
+    fp32_int8(A, A_q8, M*K, rng1); 
+    T_fp32_int8(B, B_q8, N, K, rng2);
+    /* 2. int8 multiplication */
+    AddDot8_gemm(A_q8,B_q8,C_q,M,N,K);
+    // for (int i = 0; i < M; i++) {
+    //     for (int j = 0; j < N; j++) {
+    //         int sum = 0;
+    //         for (int k = 0; k < K; k++) {
+    //             sum += A_q8[i * K + k] * B_q8[j * K + k];
+    //         }
+    //         /* 3. dequantization */
+    //         C_q[i*N + j] = sum;
+    //     }
+    // }
+    int32_fp32(C_q, C, M*N, rng1,rng2);
+    free(A_q8);
+    free(B_q8);
+    free(C_q);
 }
 void cpu_gemm(float *A, float *B, float *C, 
               int M, int N, int K){
-    for(int m = 0; m < M; ++m){
-        for(int n = 0; n < N; ++n){
-            float sum = 0;
-            for(int k = 0; k < K; ++k){
-                sum += A[m*K+k] * B[k*N+n];
-            }
-            C[m*N+n] = sum;
-        }
-    }
+    // for(int m = 0; m < M; ++m){
+    //     for(int n = 0; n < N; ++n){
+    //         float sum = 0;
+    //         for(int k = 0; k < K; ++k){
+    //             sum += A[m*K+k] * B[k*N+n];
+    //         }
+    //         C[m*N+n] = sum;
+    //     }
+    // }
+
+    T_gemm_qu_de_q8(A,B,C,M,N,K);
     // //C+= register block
     // for(int MN = 0; MN < M*N; ++MN){
     //     C[MN] = 0;
@@ -96,6 +182,47 @@ void cpu_gemm(float *A, float *B, float *C,
     //     }
     // }
     //printf(" > cpu_gemm ");
+}
+void T_gemv_qu_de_q8(float *A, float *B, float *C,int M, int N, int K){
+    //N = 1;
+    int8_t *A_q8 = (int8_t*)malloc(M * K * sizeof(int8_t));
+    int8_t *B_q8 = (int8_t*)malloc(K * N * sizeof(int8_t));
+    int    *C_q  = (int*)   malloc(M * N * sizeof(int));
+
+    /* 1. Scale Quantization */
+        //1 = positive max interger range
+    float rng1 = maximum(A,M*K);
+    float rng2 = maximum(B,K*N);
+    // printf("%.6f %.6f\n",rng1, rng2); 
+    fp32_int8(A, A_q8, M*K, rng1); 
+    fp32_int8(B, B_q8, N*K, rng2);
+    /* 2. int8 multiplication */
+    for (int i = 0; i < M; i++) {
+        int sum = 0;
+        for (int k = 0; k < K; k++) {
+            sum += A_q8[i * K + k] * B_q8[k];
+        }
+        /* 3. dequantization */
+        C_q[i] = sum;
+    }
+    int32_fp32(C_q, C, M*N, rng1,rng2);
+    free(A_q8);
+    free(B_q8);
+    free(C_q);
+}
+//merged donghee's code
+void cpu_gemv(float *A, float *B, float *C, 
+               int M, int N, int K){  //N=1
+    
+    T_gemv_qu_de_q8(A,B,C,M,N,K);
+    // for (int m = 0; m < M; ++m) {
+    //     float sum = 0;
+    //     for (int k = 0; k < K; ++k) {
+    //         sum += A[m * K + k] * B[k];
+    //     }
+    //     C[m] = sum;
+    // }
+    //printf(" > gemv ");
 }
 void cpu_depthwise_conv(float *A, float *B, float *C, 
                     int M, int N, int K,

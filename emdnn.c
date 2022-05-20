@@ -41,11 +41,32 @@ float* file_loader(float* network, char *filename){
 
     return network;
 }
+int8_t* file_loader_q8(int8_t* network, char *filename){
+    FILE *fnet = fopen(filename, "rb");
+    if (!fnet) {
+        printf("Network file does not exist.\n");
+        exit(0);
+    }
+    fseek(fnet, 0, SEEK_END);
+    long fsz = ftell(fnet);
+    // if (fsz != f_size) {
+    //     printf("Network file is corrupted.\n");
+    //     exit(0);
+    // }
+    rewind(fnet);
+    network = (int8_t*)malloc(fsz);
+    fread(network, 1, fsz, fnet);
+    fclose(fnet);
+
+    return network;
+}
 
 void make_network(LAYER *l,
             float* net_weight, 
             int num,
-            char *filename){
+            char *filename,
+            PRECISION quant,
+            int8_t* net_weight_q8){
 
 #ifdef OPENCL
     err = clGetPlatformIDs(1, &platform, NULL);
@@ -107,8 +128,13 @@ void make_network(LAYER *l,
     nnp_initialize();
     l[0].PTHREAD = pthreadpool_create(4);
 #endif
+
+if(quant == SINGLE){
     //weight loader
     net_weight = file_loader(net_weight, filename);
+}else if(quant == INT8){
+    net_weight_q8 = file_loader_q8(net_weight_q8, filename);
+}
 
     //TODO:Configuration
     net_weight += 0;    
@@ -507,6 +533,7 @@ void make_network(LAYER *l,
             l[i].OUT_C = l[i].N;
             l[i].OUT_H = l[i].IN_H;
             l[i].OUT_W = l[i].IN_W;
+            // l[i].RESULT_TXT = (char *)malloc(2048);
         default :
             return;
         }
@@ -664,7 +691,7 @@ void tune_parameter(LAYER *l,
             else if(l[i].CUR_DEVICE == GPU){
                 if(      l[i].DEVICE == CPU || l[i].DEVICE == PPU){
                     cl_obj2mem(   l[i].CL_OUTPUT, &l[i].OUTPUT, CL_MAP_WRITE,
-                                l[i].OUT_C * l[i].OUT_H * l[i].OUT_W * 
+l[i].OUT_C * l[i].OUT_H * l[i].OUT_W * 
                                 l[i].XF);
                 }else if(l[i].DEVICE == NPU){
 
@@ -752,7 +779,25 @@ LAYER* layer_update(
 
     return l;   
 }
-
+int compare(const void*a, const void*b){
+    if(*(double*)a > *(double*)b){
+        return 1;
+    }else if(*(double*)a < *(double*)b){
+        return -1;
+    }else{
+        return 0;
+    }
+}
+double three2best(double a, double b, double c){
+    double best[3];
+    best[0] = a;
+    best[1] = b;
+    best[2] = c;
+    // printf("%f %f %f - ",best[0],best[1],best[2]);
+    qsort(best, 3, sizeof(double), compare);
+    // printf("best = %f\n",best[0]);
+    return best[0];
+}
 void tune_network(LAYER *l, 
             int num){
     //TODO:coding the tuning stage !! gogo
@@ -784,6 +829,11 @@ void tune_network(LAYER *l,
         l[i].TIME_CPU = 1000.f;
         l[i].TIME_GPU = 1000.f;
         l[i].TIME_PPU = 1000.f;
+        
+        l[i].BEST_CPU = 1000.f;
+        l[i].BEST_GPU = 1000.f;
+        l[i].BEST_PPU = 1000.f;
+
         l[i].DEVICE = CPU;
         printf("%c%c ",lay_type[l[i].TYPE][0],
                        lay_type[l[i].TYPE][1]);
@@ -830,8 +880,9 @@ void tune_network(LAYER *l,
     }
 
     //tuning iteration stage
+    srand(time(NULL));
     for(int dbk=0; dbk < iter+1; ++dbk){
-        int k = dbk / 2;
+        int k = dbk;
         // int bit_vec = k;
         // //tuning result setting
         // if(k == iter){
@@ -842,30 +893,49 @@ void tune_network(LAYER *l,
         
         //device tuning
         for(int rnd = start_layer; rnd < end_layer + 1; ++rnd){
-            if(dynamicMap[(rnd-start_layer) * 4 + 0] >= 40){
+            if(dynamicMap[(rnd-start_layer) * 4 + 0] >= 30){
                 //TODO:tuning stage reset...
                 
-                double min = l[rnd].TIME_CPU;
+                double min      = three2best(l[rnd].TIME_CPU, l[rnd].TIME_GPU,l[rnd].TIME_PPU);
+                double best_min = three2best(l[rnd].BEST_CPU, l[rnd].BEST_GPU,l[rnd].BEST_PPU);
                 int    sel = 0;
-                    
-                if(l[rnd].TIME_GPU < min){
-                    sel = 1;
-                    min = l[rnd].TIME_GPU;
-                }
-                if(l[rnd].TIME_PPU < min){
-                    sel = 2;
-                    min = l[rnd].TIME_PPU;
+                if(min < best_min){
+                    if(l[rnd].TIME_CPU == min){
+                        sel = 0;
+                    }    
+                    if(l[rnd].TIME_GPU == min){
+                        sel = 1;
+                    }
+                    if(l[rnd].TIME_PPU == min){
+                        sel = 2;
+                    }
+                }else{
+                    if(l[rnd].BEST_CPU == best_min){
+                        sel = 0;
+                    }    
+                    if(l[rnd].BEST_GPU == best_min){
+                        sel = 1;
+                    }
+                    if(l[rnd].BEST_PPU == best_min){
+                        sel = 2;
+                    }
                 }
                 l[rnd].DEVICE = SEL_DEV[sel];
             }
-            else if(dynamicMap[(rnd-start_layer) * 4 + 0] >= 10){
-                l[rnd].DEVICE = SEL_DEV[ (rnd+k) % 3 ];
+            else if(dynamicMap[(rnd-start_layer) * 4 + 0] >= 20){
+                l[rnd].DEVICE = SEL_DEV[ (rand()) % 3 ];
                 dynamicMap[(rnd-start_layer)*4 + ((rnd+k) % 3)+1] += 1;
                 dynamicMap[(rnd-start_layer)*4 + 0         ] += 1;
-            }else{
-                l[rnd].DEVICE = SEL_DEV[ (k) % 3 ];
-                dynamicMap[(rnd-start_layer)*4 + ((k) % 3)+1] += 1;
+            }
+            else{
+            // else if(dynamicMap[(rnd-start_layer) * 4 + 0] >= 10){
+                l[rnd].DEVICE = SEL_DEV[ (k+rnd) % 3 ];
+                dynamicMap[(rnd-start_layer)*4 + ((rnd+k) % 3)+1] += 1;
                 dynamicMap[(rnd-start_layer)*4 + 0         ] += 1;
+            // }else{
+            //     l[rnd].DEVICE = SEL_DEV[ (k/3) % 3 ];
+            //     dynamicMap[(rnd-start_layer)*4 + ((k) % 3)+1] += 1;
+            //     dynamicMap[(rnd-start_layer)*4 + 0         ] += 1;
             }
 
 /*******bit brute force
@@ -874,7 +944,6 @@ void tune_network(LAYER *l,
                 int bitmap = (bit_vec) << (start_layer-1);
                 l[rnd+1].DEVICE = ((bitmap >> rnd) & 1) ? CPU : GPU;
             }
-
             //후반부
             if(k>=1024){
                 int bitmap = (bit_vec - 1024 ) << (num-end_layer-1);
@@ -917,7 +986,8 @@ void tune_network(LAYER *l,
 
 }
 void print_network(LAYER *l, 
-            int num){
+            int num,
+            int mode){
     char lay_type[11][20] = { 
         "input    ",    "conv     ",    "conv_dw  ",    "connect  ",
         "connect_t",
@@ -930,16 +1000,39 @@ void print_network(LAYER *l,
     printf("layer :      type :     C * (      H *      W) || DEVICE  \n");
     printf("======================================================== \n");
     for(int j = 0; j<num; ++j){
-        printf("%5d : %s : %5d * (  %5d *  %5d)  || %s\n", 
+        if(l[j].TYPE == INPUT_LAYER){
+            printf("%5d : %s : %5d * (  %5d *  %5d)  || %s\n", 
+                j, lay_type[l[j].TYPE], l[j].OUT_C, l[j].OUT_H, l[j].OUT_W,
+                lay_type[0]);
+        }else if(l[j].TYPE == DETECTION || l[j].TYPE == CLASSIFICATION){
+            if(l[j].TYPE == DETECTION){
+                printf("%5d : %s : %5d * (  %5d *  %5d)  || %s\n", 
+                    j, lay_type[l[j].TYPE], l[j].OUT_C, l[j].OUT_H, l[j].OUT_W,
+                    lay_type[8]);
+            }else{
+                printf("%5d : %s : %5d * (  %5d *  %5d)  || %s\n", 
+                    j, lay_type[l[j].TYPE], l[j].OUT_C, l[j].OUT_H, l[j].OUT_W,
+                    lay_type[9]);
+            }
+        }else if(l[j].TYPE == MAXPOOL || l[j].TYPE == SOFTMAX
+                 || l[j].TYPE == AVGPOOL || l[j].TYPE == SHORTCUT){
+            printf("%5d : %s : %5d * (  %5d *  %5d)  || %s\n", 
+                j, lay_type[l[j].TYPE], l[j].OUT_C, l[j].OUT_H, l[j].OUT_W,
+                "  -");
+        }else{
+            printf("%5d : %s : %5d * (  %5d *  %5d)  || %s\n", 
                 j, lay_type[l[j].TYPE], l[j].OUT_C, l[j].OUT_H, l[j].OUT_W,
                 dev_type[l[j].DEVICE]);
+        }
+        
     }
 }
 void inference(LAYER *l, 
             int num){
     // for(int i = 0; i<3; ++i){            
     double tic;
-    for(int i = 0; i<num; ++i){    
+    for(int i = 0; i<num; ++i){
+        double latency = 0.0f;    
         if(!l[i].TUNE && DEBUG_PRINT)   printf("now layer >> %d ", i);
         
         tic = get_time();
@@ -971,7 +1064,9 @@ void inference(LAYER *l,
 
             }
         }
-        if(l[i].TUNE) printf("#%.6f",get_time()-tic);
+        tic = get_time()-tic;
+        latency += tic;
+        if(l[i].TUNE) printf("#%.6f",tic);
         switch(l[i].TYPE){
         case INPUT_LAYER :
             // l[i].OUTPUT = input_bin_img(l[i].OUTPUT, 
@@ -998,6 +1093,7 @@ void inference(LAYER *l,
 
             if(l[i].TUNE){ 
                 tic = get_time() - tic;
+                latency += tic;
                 if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
                                              l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
                 else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
@@ -1032,6 +1128,7 @@ void inference(LAYER *l,
                               l[i].OUT_C, l[i].OUT_H,l[i].OUT_W);
             if(l[i].TUNE){ 
                 tic = get_time() - tic;
+                latency += tic;
                 if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
                                              l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
                 else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
@@ -1062,6 +1159,7 @@ void inference(LAYER *l,
                               l[i].OUT_C, l[i].OUT_H,l[i].OUT_W);
             if(l[i].TUNE){ 
                 tic = get_time() - tic;
+                latency += tic;
                 if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
                                              l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
                 else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
@@ -1086,6 +1184,7 @@ void inference(LAYER *l,
                     l[i].W, l[i].STRIDE, l[i].PAD);
             if(l[i].TUNE){ 
                 tic = get_time() - tic;
+                latency += tic;
                 if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
                                              l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
                 else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
@@ -1111,6 +1210,7 @@ void inference(LAYER *l,
                     l[i].N);
             if(l[i].TUNE){ 
                 tic = get_time() - tic;
+                latency += tic;
                 if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
                                              l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
                 else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
@@ -1135,6 +1235,7 @@ void inference(LAYER *l,
                     l[i].W, l[i].STRIDE, l[i].PAD);
             if(l[i].TUNE){ 
                 tic = get_time() - tic;
+                latency += tic;
                 if     (l[i].DEVICE == CPU){ l[i].TIME_CPU = 
                                              l[i].TIME_CPU < tic ? l[i].TIME_CPU : tic; }
                 else if(l[i].DEVICE == GPU){ l[i].TIME_GPU = 
@@ -1164,7 +1265,7 @@ void inference(LAYER *l,
             break;
         case CLASSIFICATION :
             //$$merged donghee's code
-            classification(l[i-1].OUTPUT,1000,l[i].TUNE);
+            classification(l[i-1].OUTPUT,1000,l[i].TUNE,NULL);
             break;
         default :
             return;
@@ -1199,7 +1300,31 @@ void inference(LAYER *l,
 
             }
         }
-        if(l[i].TUNE) printf(" %.6f",get_time()-tic);
+        tic = get_time()-tic;
+        latency += tic;
+        if(l[i].TUNE) printf(" %.6f",tic);
+
+
+        if(l[i].DEVICE == CPU){
+            if(l[i].BEST_CPU > latency){
+                l[i].BEST_CPU = latency;
+            }
+            l[i].TIME_CPU = latency;
+
+        }else if(l[i].DEVICE == GPU){
+            if(l[i].BEST_GPU > latency){
+                l[i].BEST_GPU = latency;
+            }
+            l[i].TIME_GPU = latency;
+
+        }else if(l[i].DEVICE == PPU){
+            if(l[i].BEST_PPU > latency){
+                l[i].BEST_PPU = latency;
+            }
+            l[i].TIME_PPU = latency;
+
+        }
+
 // debuging code
 // if(i+1 == num){
 // // for(int rr = 0; rr<13*13*5*20; ++rr){

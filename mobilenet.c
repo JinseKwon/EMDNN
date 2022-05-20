@@ -1,8 +1,36 @@
 #include "emdnn.h"
 
-int main(){
+int main(int argc, char *argv[]){
     char f_name[100] = "mobilenet_v1_72.weights";
     char img_name[100] = "dog.jpg"; // "cat.jpg"; //
+    char vid_name[100] = "video.mp4";
+
+    char c = '0';
+    if(argc > 1)
+        if(argv[1][0] == 'b') c = 'b';
+
+    DEVICE_TYPE sel_dev;
+    DEVICE_TYPE sel_dev2;
+    int opt_mode = 0;
+    switch (c) {
+        case 'b':             /* print help message */
+            if(!strcmp(argv[2],"openblas")){
+                sel_dev = CPU;
+                sel_dev2 = CPU;
+            }else if(!strcmp(argv[2],"clblast")){
+                sel_dev = GPU;
+                sel_dev2 = GPU;
+            }else if(!strcmp(argv[2],"opt_blas")){
+                sel_dev  = GPU;
+                sel_dev2 = CPU;
+                opt_mode = 1;
+            }
+            break;
+        default:
+            sel_dev  = CPU;
+            sel_dev2 = CPU;
+            break;
+    }
 
     float *net_weight;
     LAYER *l = (LAYER *)malloc(sizeof(LAYER));
@@ -54,20 +82,25 @@ int main(){
 
     int num_layer = i;
     make_network(l,net_weight,num_layer,f_name);
-    tune_network(l,num_layer);
+    if(opt_mode) tune_network(l,num_layer);
 
-    print_network(l,num_layer);
-    for(int rr =0 ; rr <5; ++rr){
-        IplImage *cvimg = image_read(img_name, l[0].OUTPUT, l[0].W,
-                                    //  103.94f,  116.78f,  123.68f);
-                                     0.0f,  0.0f,  0.0f);
+    print_network(l,num_layer,opt_mode);
+
+    char* class_result;
+    IplImage *cvimg;
+    CvCapture* pCapture = NULL; 
+    if( !(pCapture = cvCaptureFromFile(img_name)) )
+        printf("Video Capture Wrong!\n");
+    for(int rr =0 ; rr <1000; ++rr){
+        // cvimg = Ipl_read(cvQueryFrame( pCapture ), l[0].OUTPUT, l[0].W, 0.0f, 0.0f, 0.0f);
+        cvimg = image_read(img_name, l[0].OUTPUT, l[0].W, 0.0f, 0.0f, 0.0f);
         
         double tic = get_time();
-        
         inference(l,num_layer);
-        
-        printf("%.6f times \n\n",get_time()-tic);
-        // image_show(l[num_layer-1].OUTPUT, cvimg);
+        tic = get_time() - tic;
+        printf("%.6f times\n",tic);   
+        class_result = class_print();
+        // image_show_class(class_result, cvimg, tic);
     }
 
     return 0;

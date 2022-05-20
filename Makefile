@@ -13,7 +13,7 @@ NNPACK_PATH=/home/shunya/NNPACK-darknet
 
 CC=g++
 CFLAGS= -g -W -Wall -O2
-OBJS=emdnn.o  blas.o detection_layer.o classification_layer.o image_io.o 
+OBJS=emdnn.o  blas.o detection_layer.o classification_layer.o image_io.o quantization.o
 SRCS=$(patsubst %.o, %.c, $(OBJS))
 LIBS=-lm `pkg-config --libs opencv`
 DEF=
@@ -47,8 +47,8 @@ LIBS+= -fPIC $(NNPACK_PATH)/lib/libpthreadpool.a -lpthread -lm
 INC+= -I $(NNPACK_PATH)/include
 endif
 
-TARGET=skeleton
-TAR_OBJS=skeleton.o
+TARGET=yolotiny
+TAR_OBJS=yolotiny.o
 TARGET2=alexnet
 TAR_OBJS2=alexnet.o
 TARGET3=tinydark
@@ -57,8 +57,10 @@ TARGET4=vgg16
 TAR_OBJS4=vgg16.o
 TARGET5=mobilenet
 TAR_OBJS5=mobilenet.o
+TARGET6=mnist
+TAR_OBJS6=mnist.o
 
-all: $(TARGET) $(TARGET2) $(TARGET3) $(TARGET4) $(TARGET5) 
+all: $(TARGET) $(TARGET2) $(TARGET3) $(TARGET4) $(TARGET5) #$(TARGET6) 
 
 $(TARGET): $(OBJS) $(TAR_OBJS)
 	$(CC) -o $(TARGET)  $(CFLAGS) $(TAR_OBJS)  $(OBJS) $(LIBS) $(DEF) $(INC)
@@ -74,12 +76,15 @@ $(TARGET4): $(OBJS) $(TAR_OBJS4)
 
 $(TARGET5): $(OBJS) $(TAR_OBJS5)
 	$(CC) -o $(TARGET5) $(CFLAGS) $(TAR_OBJS5) $(OBJS) $(LIBS) $(DEF) $(INC)
-	# rm *.o
+
+$(TARGET6): $(OBJS) $(TAR_OBJS6)
+	$(CC) -o $(TARGET6) $(CFLAGS) $(TAR_OBJS6) $(OBJS) $(LIBS) $(DEF) $(INC)
+	rm *.o
 
 alexnet.o : alexnet.c
 	$(CC) -c -o $@ $^ $(DEF) $(INC)
 
-skeleton.o : skeleton.c
+yolotiny.o : yolotiny.c
 	$(CC) -c -o $@ $^ $(DEF) $(INC)
 
 tinydark.o : tinydark.c
@@ -89,6 +94,9 @@ vgg16.o : vgg16.c
 	$(CC) -c -o $@ $^ $(DEF) $(INC)
 
 mobilenet.o : mobilenet.c
+	$(CC) -c -o $@ $^ $(DEF) $(INC)
+
+mnist.o : mnist.c
 	$(CC) -c -o $@ $^ $(DEF) $(INC)
 
 emdnn.o : emdnn.c
@@ -106,5 +114,8 @@ classification_layer.o : classification_layer.c
 image_io.o : image_io.c 
 	$(CC) -c -o image_io.o image_io.c `pkg-config --cflags --libs opencv` $(DEF) $(INC)
 
+quantization.o : quantization.c
+	$(CC) -c -o quantization.o quantization.c $(DEF) $(INC)
+
 clean :
-	rm *.o $(TARGET) $(TARGET2) $(TARGET3) $(TARGET4) $(TARGET5)
+	rm *.o $(TARGET) $(TARGET2) $(TARGET3) $(TARGET4) $(TARGET5) $(TARGET6)

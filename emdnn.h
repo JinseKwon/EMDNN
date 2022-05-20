@@ -4,6 +4,7 @@
 #include <math.h>
 #include <float.h>
 #include "opencv/highgui.h"
+#include <time.h>
 // #include "image_io.h"
 #ifdef OPENCL
 #include <CL/cl.h>
@@ -31,8 +32,8 @@ typedef enum{
 typedef enum{
     CPU,
     GPU,
-    NPU,
-    PPU
+    PPU,
+    NPU
 }DEVICE_TYPE;
 
 //layer print할때 enumerate 열거형 string 형태로 표기하기 위함
@@ -48,6 +49,7 @@ typedef enum{
 } ACTIVATION_TYPE;
 
 typedef enum{
+    INT8 = 1,
     HALF = 2, 
     SINGLE = 4, 
     DOUBLE = 8
@@ -85,7 +87,12 @@ typedef struct LAYER{
     int OUT_H;
     int OUT_W;
 
+    //Quantization
     PRECISION XF;
+    float Q8_scale;
+    float Q8_zero;
+    int8_t* Q8_BIAS;
+    int8_t* Q8_WEIGHT;
 
     //im2col
     int IM2COL;
@@ -96,6 +103,9 @@ typedef struct LAYER{
     double TIME_GPU;
     double TIME_PPU;
     double TIME_NPU;
+    double BEST_CPU;
+    double BEST_GPU;
+    double BEST_PPU;
 
     //DATA
     float* BIAS;
@@ -103,6 +113,7 @@ typedef struct LAYER{
     float* INPUT;
     float* OUTPUT;
 
+    
 #ifdef OPENCL
     cl_mem CL_WEIGHT;
     cl_mem CL_BIAS;
@@ -132,8 +143,10 @@ typedef struct LAYER{
 extern void make_network(LAYER *l,
             float* net_weight, 
             int num,
-            char *filename);
-
+            char *filename,
+            PRECISION quant = SINGLE,
+            int8_t* net_weight_q8 = NULL);
+extern void quant_network(LAYER *l, int num);
 extern LAYER* layer_update(
 // extern void layer_update(
             LAYER *l,
@@ -152,7 +165,8 @@ extern void tune_network(LAYER *l,
             int num);
 
 extern void print_network(LAYER *l, 
-            int num);
+            int num,
+            int mode);
 
 extern void inference(LAYER *l, 
             int num);
@@ -220,16 +234,24 @@ void detection(float *grid_cell,float* box_out,
 
 void classification(float *output_score, 
                     int class_num,
-                    int tune);//donghee
+                    int tune,
+                    char *result);//donghee
+char* class_print();
+float top1_score();
+int   top1_idx();
 
 // void cam_read(float *image, int img_size);
 IplImage* image_read(char *img_file, float *image, int img_size,
                      float mean_r,   float mean_g, float mean_b);
+IplImage* Ipl_read(IplImage* input_img, float *image, int img_size,
+                     float mean_r,   float mean_g, float mean_b);
 
 // void imagefile_read( float *image, int img_size, char *filename);
 // void imagefile_read2( float *image, int img_size,int n);
-void image_show(float* box_output, IplImage *readimg,
-                double elapsed);
+void image_show_yolo(float* box_output, IplImage *readimg,
+                     double elapsed,int show_time=33);
+void image_show_class(char* class_text, IplImage *readimg,
+                      double elapsed,int show_time=33);
 void image_free();
 
 #ifdef OPENCL

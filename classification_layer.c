@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include "emdnn.h"
 #include "classification_class.h"
-
+char RESULT_TXT[2000];
+float top1_s;
+int   top1_i;
 // #define ALEX
 // #define VGG
 
@@ -59,38 +61,40 @@ void quick_sort2(float* array, int start, int end, int* table){
 
 void classification(float *output_score,
                     int class_num, 
-                    int tune){
-    int index_table[1000];
-    for(int i = 0; i<1000; ++i){
+                    int tune,
+                    char *result){
+    int index_table[class_num];
+
+    // printf("class num : %d\n",class_num);
+    for(int i = 0; i<class_num; ++i){
         index_table[i] = i;
     }
+    // result = (char*)malloc(1000);
     quick_sort2(output_score, 0, class_num-1, index_table);   
-    
-    char text[50];
-    //cvResize(input_img, viewimg, 0);
-    // cvInitFont(&font, CV_FONT_HERSHEY_SIMPLEX, 0.6, 0.6, 0 ,2);//, 0, 1, CV_AA);
-    // cvInitFont(&font_guide, CV_FONT_HERSHEY_DUPLEX, 1.0, 1.0, 0 ,3);//, 0, 1, CV_AA);
-    // cvInitFont(&font_txt, CV_FONT_HERSHEY_SIMPLEX, 0.6, 0.6, 0 ,2);//, 0, 1, CV_AA);
-
-    if(!tune) printf("\n");
+    char text[1000]={""};
+    ////// if(!tune) printf("\n");
     for(int i = 0; i<5; ++i){
-        sprintf(text, "top%d :(idx : %d) %2.3f ( %s ) ",i,index_table[i], output_score[i]*100, class_name[index_table[i]] );
+        if(class_num == 10){
+            sprintf(text, "%stop%d :(idx : %d) %2.3f\% \n",text,i,index_table[i], output_score[i]*100);    
+        }else{
+            sprintf(text, "%stop%d :(idx : %d) %2.3f\% ( %s ) \n",text,i,index_table[i], output_score[i]*100, class_name[index_table[i]] );
+        }
         // cvPutText(viewimg, text, cvPoint(10, 100+30*i), &font, CV_RGB(255,255,41));
-        if(!tune) printf("%s \n", text);
     }
-    // sprintf(text, "%.1f", 1/elapsed);//1/(get_time()-end_time));
-    // cvPutText(viewimg, text, cvPoint(350, 50), &font_guide, CV_RGB(4, 255, 75));    //FPS val
-    // cvPutText(viewimg, "FPS", cvPoint(350, 20), &font_txt, CV_RGB(4, 255, 75));    //FPS txt
-
-
-    // printf( "top%d :(idx : %d) %2.3f ( %s ) \n",0,index_table[0], output_score[0]*100, class_name[index_table[0]] );
-    // sprintf(text, "%.0fms", 1000*elapsed);//1/(get_time()-end_time));
-    // cvPutText(viewimg, "latency", cvPoint(200, 24), &font_txt, CV_RGB(255, 29, 29));    //latency txt
-    // cvPutText(viewimg, text, cvPoint(200, 50), &font_guide, CV_RGB(255, 29, 29));    //latency val
-
-//    cvShowImage("Image Classification",viewimg);
-    // cvWaitKey(10000);
-    // return 1;//
- //   cvWaitKey(33);
-    // //if(cvWaitKey(33) == 1048691){   "s" key input
+    // printf("%s",text);
+    // if(!tune) printf("%s", text);
+    // RESULT_TXT = (char*)malloc(1024);
+    top1_s = output_score[0];
+    top1_i = index_table[0];
+    sprintf(RESULT_TXT, "%s", text);
+    
+}
+char* class_print(){
+    return RESULT_TXT;
+}
+float top1_score(){
+    return top1_s;
+}
+int top1_idx(){
+    return top1_i;
 }

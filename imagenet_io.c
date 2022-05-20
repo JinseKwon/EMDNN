@@ -159,9 +159,9 @@ int image_show(float *output_score,int class_num){
     // cvPutText(viewimg, text, cvPoint(200, 50), &font_guide, CV_RGB(255, 29, 29));    //latency val
 
     cvShowImage("Image Classification",viewimg);
-    // cvWaitKey(10000);
+    cvWaitKey(10000);
     // return 1;//
-    cvWaitKey(33);
+    // cvWaitKey(33);
     // //if(cvWaitKey(33) == 1048691){   "s" key input
 }
 void image_free(){
