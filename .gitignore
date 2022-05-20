@@ -1,0 +1,22 @@
+#weight files..
+*.weights
+
+#object files...
+*.o
+
+#deprecated files...
+mobilenet_v1_72.c
+airplane.jpg
+airplane1.jpg
+alexnet.results
+.mp4
+
+#folder 
+log/
+tmp/
+#execution files...
+alexnet
+skeleton
+mobilenet
+vgg16
+tinydark
